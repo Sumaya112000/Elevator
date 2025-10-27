@@ -7,6 +7,7 @@ public class Elevator {
     public boolean doorOpen;
     public String direction;
     public String status;
+    public String mode;
 
     public Elevator() {
         CurrentFloor = 0;
@@ -15,6 +16,7 @@ public class Elevator {
         doorOpen = false;
         direction = "UP";
         status = "ON";
+        mode = "NORMAL";
     }
 
     /**
@@ -54,6 +56,12 @@ public class Elevator {
     public String getStatus() { return status; }
 
     /**
+     * Getter to return the current operating mode
+     * @return a string containing the mode (e.g., "NORMAL", "FIRE", "AUTO")
+     */
+    public String getMode() { return mode; }
+
+    /**
      * Setter to change the floor
      * @param floor the floor the elevator is currently at
      */
@@ -79,6 +87,42 @@ public class Elevator {
                 CurrentFloor = 1;
             }
             doorOpen = true;
+        }
+    }
+
+    /**
+     * Setter to set the operating mode
+     * @param mode "NORMAL", "FIRE", or "AUTO"
+     */
+    public void setMode(String mode) {
+        this.mode = mode;
+        if (mode.equals("FIRE_EMERGENCY")) {
+            // Fire mode
+            // all elevators go to the first floor
+            // all doors open
+            // all buttons are disabled
+            // request to first floor and open doors
+            if(CurrentFloor != 1){
+                try{
+                    request(1);
+                } catch (Exception e){
+                    String message = e.getMessage();
+                    System.out.println(message);
+                }
+                CurrentFloor = 1;
+            }
+            doorOpen = true;
+            moving = false; // Stop movement
+            direction = "DOWN";
+            this.status = "OFF";
+            System.out.println("Fire Mode");
+        } else if (mode.equals("AUTO")) {
+            // Auto mode requests are managed by a central system
+            System.out.println("Mode Auto");
+            this.status = "ON";
+        } else if (mode.equals("NORMAL")) {
+            this.status = "ON";
+            System.out.println("Mode Normal");
         }
     }
 
@@ -111,6 +155,16 @@ public class Elevator {
      * @param destFloor the floor the elevator is going to
      */
     public void request(int destFloor) throws Exception {
+        // Prevent requests if the elevator is OFF or in FIRE mode
+        if (status.equals("OFF")) {
+            throw new Exception("Elevator is " + status + ". Request denied.");
+        }
+        if (mode.equals("FIRE")) {
+            if (destFloor != 1 || CurrentFloor == 1) {
+                throw new Exception("Elevator is in FIRE mode");
+            }
+        }
+
         // validate the requested floor
         if(destFloor > 10 || destFloor < 1){
             throw new Exception("Invalid Floor Number");
