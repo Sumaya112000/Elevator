@@ -1,3 +1,4 @@
+package GUI;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -9,10 +10,9 @@ import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 
 /**
- * The main entry point for the JavaFX application.
- * This class initializes the main window and holds the central state
- * (systemMode, systemRunning) that is shared between the CommandPanel
- * and all the individual ElevatorPanels.
+ * This is the main class that starts the whole application.
+ * It builds the window and acts like the "boss" for all the
+ * elevator panels and control buttons.
  */
 public class ElevatorControlSystem extends Application {
 
@@ -23,9 +23,7 @@ public class ElevatorControlSystem extends Application {
     private CommandPanel commandPanel;
 
     /**
-     * Initializes and displays the primary application window (Stage).
-     * It sets up the BorderPane layout, creates the title, the CommandPanel,
-     * and initializes the four ElevatorPanel instances.
+     * This method sets up and shows the main window when the app starts.
      */
     @Override
     public void start(Stage primaryStage) {
@@ -34,35 +32,42 @@ public class ElevatorControlSystem extends Application {
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #333333;"); // Dark Gray
 
-        // Top Panel for the Title
         Label titleLabel = new Label("Command Center");
         titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
         StackPane titlePane = new StackPane(titleLabel);
         titlePane.setPadding(new Insets(10));
-        root.setTop(titlePane);
+        root.setTop(titleLabel);
 
-        // Center Panel for Elevators
         HBox elevatorContainer = new HBox(15);
         elevatorContainer.setAlignment(Pos.TOP_CENTER);
         elevatorContainer.setPadding(new Insets(10));
 
-        // Create the 4 elevator panels
         for (int i = 0; i < 4; i++) {
             elevators[i] = new ElevatorPanel(i + 1, this);
             elevatorContainer.getChildren().add(elevators[i]);
         }
 
-        // Wrapper to keep elevators centered
         StackPane centerWrapper = new StackPane(elevatorContainer);
         centerWrapper.setStyle("-fx-background-color: #333333;");
         root.setCenter(centerWrapper);
 
-        // Right Command Panel
         commandPanel = new CommandPanel(this, elevators);
         root.setRight(commandPanel);
 
-        // Set the system to its default state on launch
-        resetSystemToInitialState();
+        // Set up the buttons and labels for the first time
+        setInitialUIState();
+
+        // Give each elevator its list of floors to visit
+        int[] seq1 = {1, 8, 10, 4, 7, 1};
+        int[] seq2 = {1, 9, 1, 6, 10, 2};
+        int[] seq3 = {8, 1, 4, 7, 2, 9};
+        int[] seq4 = {10, 5, 2, 6, 3, 1};
+
+        // Tell the elevators to start their automatic loops
+        elevators[0].startAutomatedLoop(seq1);
+        elevators[1].startAutomatedLoop(seq2);
+        elevators[2].startAutomatedLoop(seq3);
+        elevators[3].startAutomatedLoop(seq4);
 
         Scene scene = new Scene(root);
         primaryStage.setScene(scene);
@@ -70,15 +75,10 @@ public class ElevatorControlSystem extends Application {
     }
 
     /**
-     * Sets the global operation mode (CENTRALIZED, INDEPENDENT, FIRE).
-     * This method also notifies all individual elevators of the mode change
-     * so they can update their internal logic.
-     *
-     * @param mode The new system mode (e.g., "CENTRALIZED").
+     * Changes the system's main mode (like "CENTRALIZED" or "FIRE").
      */
     public void setSystemMode(String mode) {
         this.systemMode = mode;
-        // Tell elevators the mode changed
         for (ElevatorPanel elevator : elevators) {
             elevator.onSystemModeChange(mode);
         }
@@ -86,22 +86,17 @@ public class ElevatorControlSystem extends Application {
     }
 
     /**
-     * Returns the current global operation mode.
-     * @return The current system mode string.
+     * Gets the system's current mode.
      */
     public String getSystemMode() {
         return systemMode;
     }
 
     /**
-     * Sets the system's power state (START/STOP).
-     * This updates the CommandPanel to enable/disable the appropriate buttons.
-     *
-     * @param running True if the system is running, false if stopped.
+     * Turns the whole system "ON" (running) or "OFF" (stopped).
      */
     public void setSystemRunning(boolean running) {
         this.systemRunning = running;
-        // Update CommandPanel buttons based on state
         if (commandPanel != null) {
             commandPanel.updateButtonStates(running);
         }
@@ -109,26 +104,31 @@ public class ElevatorControlSystem extends Application {
     }
 
     /**
-     * Checks if the system is currently in a "running" (ON) state.
-     * @return True if running, false if stopped.
+     * Checks if the system is currently "ON".
      */
     public boolean isSystemRunning() {
         return systemRunning;
     }
 
     /**
-     * Resets the entire simulation to its default starting state.
-     * This sets the mode to CENTRALIZED, turns the system ON,
-     * resets the CommandPanel visuals, and forces all elevators
-     * back to their initial state (Floor 1, doors closed).
+     * Sets up the control buttons and labels to their starting look.
      */
-    public void resetSystemToInitialState() {
+    public void setInitialUIState() {
         setSystemMode("CENTRALIZED");
         setSystemRunning(true);
 
         if (commandPanel != null) {
             commandPanel.updateForReset();
         }
+    }
+
+
+    /**
+     * This is called when the user clicks the "RESET" button.
+     * It resets the buttons and tells all elevators to go to floor 1.
+     */
+    public void resetSystemToInitialState() {
+        setInitialUIState();
 
         for (ElevatorPanel elevator : elevators) {
             elevator.forceReset();
@@ -136,7 +136,7 @@ public class ElevatorControlSystem extends Application {
     }
 
     /**
-     * The main method to launch the JavaFX application.
+     * This is the main starting point that launches the application.
      */
     public static void main(String[] args) {
         launch(args);
