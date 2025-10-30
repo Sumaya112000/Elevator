@@ -49,11 +49,10 @@ public class ElevatorPanel extends VBox {
     private VBox movingCar;
     private Label carFloorLabel;
 
-    // Animation timers
     private TranslateTransition elevatorAnimation;
     private PauseTransition waitAtFloor;
     private PauseTransition waitAfterClose;
-    private PauseTransition checkAgainPause; // The pause for the idle "FIRE" or "STOP" check
+    private PauseTransition checkAgainPause;
 
     private int[] automatedSequence;
     private int sequenceIndex = 0;
@@ -294,25 +293,19 @@ public class ElevatorPanel extends VBox {
      * Used by FIRE mode to force the elevator to floor 1 and hold doors open.
      */
     public void forceMoveAndOpen(int targetFloor) {
-        stopAllTimers(); // Stop any in-progress loops
+        stopAllTimers();
         isMoving = true;
         setDirection(Direction.IDLE);
-
-        // --- FIX 1 IS HERE ---
-        // Immediately close the door *before* moving.
         setDoorStatus(false);
-        // --- END OF FIX ---
 
         if (targetFloor == currentFloor) {
-            // If already at floor 1, skip animation and just open door.
             setDoorStatus(true);
-            isMoving = true; // STAY locked
+            isMoving = true;
         } else {
-            // Animate to the target floor.
             updateElevatorPosition(targetFloor, true);
             elevatorAnimation.setOnFinished(e -> {
-                setDoorStatus(true); // Open the door *after* arriving.
-                isMoving = true; // STAY locked
+                setDoorStatus(true);
+                isMoving = true;
             });
             elevatorAnimation.play();
         }
@@ -322,14 +315,13 @@ public class ElevatorPanel extends VBox {
      * Used to release the elevator from FIRE mode.
      */
     public void releaseAndClose() {
-        stopAllTimers(); // Stop the "FIRE" check loop
+        stopAllTimers();
         setDoorStatus(false);
-        isMoving = false; // Release the lock
+        isMoving = false;
 
-        // Create a new 2-second pause before restarting
         PauseTransition restartPause = new PauseTransition(Duration.millis(2000));
         restartPause.setOnFinished(e -> {
-            runNextMoveInSequence(); // <-- THIS RESTARTS THE LOOP
+            runNextMoveInSequence();
         });
         restartPause.play();
     }
@@ -339,7 +331,7 @@ public class ElevatorPanel extends VBox {
      * Animates the car back to Floor 1, waits 5 seconds, then starts the loop.
      */
     public void forceReset() {
-        stopAllTimers(); // Stop any in-progress loops
+        stopAllTimers();
 
         isMoving = true;
         isEnabled = true;
@@ -347,13 +339,8 @@ public class ElevatorPanel extends VBox {
         mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
 
         setDirection(Direction.IDLE);
-
-        // --- FIX 2 IS HERE ---
-        // Immediately close the door *before* moving.
         setDoorStatus(false);
-        // --- END OF FIX ---
-
-        updateElevatorPosition(1, true); // Animate to floor 1
+        updateElevatorPosition(1, true);
 
         PauseTransition waitAfterReset = new PauseTransition(Duration.millis(5000));
 
@@ -364,7 +351,6 @@ public class ElevatorPanel extends VBox {
 
         elevatorAnimation.setOnFinished(e -> {
             setDoorStatus(false);
-
             waitAfterReset.play();
         });
 
@@ -377,8 +363,6 @@ public class ElevatorPanel extends VBox {
     public void startAutomatedLoop(int[] sequence) {
         this.automatedSequence = sequence;
         this.sequenceIndex = 0;
-
-        // This makes the elevator start its loop immediately on startup.
         runNextMoveInSequence();
     }
 
@@ -387,7 +371,6 @@ public class ElevatorPanel extends VBox {
      */
     private void runNextMoveInSequence() {
 
-        // First, check if the system is ON and not in FIRE mode.
         if (!system.isSystemRunning() || system.getSystemMode().equals("FIRE") || !isEnabled) {
             checkAgainPause = new PauseTransition(Duration.millis(1000));
             checkAgainPause.setOnFinished(e -> runNextMoveInSequence());
@@ -402,31 +385,26 @@ public class ElevatorPanel extends VBox {
 
         isMoving = true;
 
-        // Get the next floor from the list, or loop to the start
         if (sequenceIndex >= automatedSequence.length) {
             sequenceIndex = 0;
         }
         int targetFloor = automatedSequence[sequenceIndex];
         sequenceIndex++;
 
-        // Instantiate the class-level timers
         waitAtFloor = new PauseTransition(Duration.millis(2000));
         waitAfterClose = new PauseTransition(Duration.millis(2000));
 
 
-        // After waiting 2 seconds (door closed), start the next move
         waitAfterClose.setOnFinished(e -> {
             isMoving = false;
             runNextMoveInSequence();
         });
 
-        // After waiting 2 seconds (door open), close the door
         waitAtFloor.setOnFinished(e -> {
             setDoorStatus(false);
             waitAfterClose.play();
         });
 
-        // When the elevator arrives at the floor, open the door
         elevatorAnimation.setOnFinished(e -> {
             setDirection(Direction.IDLE);
             setDoorStatus(true);
@@ -434,13 +412,10 @@ public class ElevatorPanel extends VBox {
         });
 
 
-        // Start the process
         if (targetFloor == currentFloor) {
-            // If already at the floor, just open the door
             setDoorStatus(true);
             waitAtFloor.play();
         } else {
-            // If at a different floor, start moving
             setDirection(targetFloor > currentFloor ? Direction.UP : Direction.DOWN);
             updateElevatorPosition(targetFloor, true);
             elevatorAnimation.play();
