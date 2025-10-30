@@ -1,7 +1,9 @@
 package GUI;
 
 import javafx.animation.PauseTransition;
+import javafx.animation.SequentialTransition;
 import javafx.animation.TranslateTransition;
+import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -11,6 +13,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Polygon;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
@@ -44,7 +48,13 @@ public class ElevatorPanel extends VBox {
     private Pane carPane;
     private VBox movingCar;
     private Label carFloorLabel;
+
+    // Animation timers
     private TranslateTransition elevatorAnimation;
+    private PauseTransition waitAtFloor;
+    private PauseTransition waitAfterClose;
+    private PauseTransition checkAgainPause; // The pause for the idle "FIRE" or "STOP" check
+
     private int[] automatedSequence;
     private int sequenceIndex = 0;
     private final ConcurrentHashMap<Integer, DualDotIndicatorPanel> floorCallIndicators = new ConcurrentHashMap<>();
@@ -68,7 +78,6 @@ public class ElevatorPanel extends VBox {
             getChildren().addAll(upDot, downDot);
             setAlignment(Pos.CENTER);
             setPadding(new Insets(0, 5, 0, 5));
-            // Clicks are disabled for automated loop
         }
         public void setDotLit(Direction direction, boolean lit) {
             Color color = lit ? Color.WHITE : Color.web("#505050");
@@ -272,28 +281,57 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
+     * Stops all running animations and pauses to prevent race conditions.
+     */
+    private void stopAllTimers() {
+        elevatorAnimation.stop();
+        if (waitAtFloor != null) waitAtFloor.stop();
+        if (waitAfterClose != null) waitAfterClose.stop();
+        if (checkAgainPause != null) checkAgainPause.stop();
+    }
+
+    /**
      * Used by FIRE mode to force the elevator to floor 1 and hold doors open.
      */
     public void forceMoveAndOpen(int targetFloor) {
-        elevatorAnimation.stop();
+        stopAllTimers(); // Stop any in-progress loops
         isMoving = true;
         setDirection(Direction.IDLE);
-        updateElevatorPosition(targetFloor, true);
 
-        elevatorAnimation.setOnFinished(e -> {
+        // --- FIX 1 IS HERE ---
+        // Immediately close the door *before* moving.
+        setDoorStatus(false);
+        // --- END OF FIX ---
+
+        if (targetFloor == currentFloor) {
+            // If already at floor 1, skip animation and just open door.
             setDoorStatus(true);
             isMoving = true; // STAY locked
-        });
-
-        elevatorAnimation.play();
+        } else {
+            // Animate to the target floor.
+            updateElevatorPosition(targetFloor, true);
+            elevatorAnimation.setOnFinished(e -> {
+                setDoorStatus(true); // Open the door *after* arriving.
+                isMoving = true; // STAY locked
+            });
+            elevatorAnimation.play();
+        }
     }
 
     /**
      * Used to release the elevator from FIRE mode.
      */
     public void releaseAndClose() {
+        stopAllTimers(); // Stop the "FIRE" check loop
         setDoorStatus(false);
-        isMoving = false;
+        isMoving = false; // Release the lock
+
+        // Create a new 2-second pause before restarting
+        PauseTransition restartPause = new PauseTransition(Duration.millis(2000));
+        restartPause.setOnFinished(e -> {
+            runNextMoveInSequence(); // <-- THIS RESTARTS THE LOOP
+        });
+        restartPause.play();
     }
 
     /**
@@ -301,13 +339,20 @@ public class ElevatorPanel extends VBox {
      * Animates the car back to Floor 1, waits 5 seconds, then starts the loop.
      */
     public void forceReset() {
-        elevatorAnimation.stop();
+        stopAllTimers(); // Stop any in-progress loops
+
         isMoving = true;
         isEnabled = true;
         mainControlButton.setText(btnText_STOP);
         mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
 
         setDirection(Direction.IDLE);
+
+        // --- FIX 2 IS HERE ---
+        // Immediately close the door *before* moving.
+        setDoorStatus(false);
+        // --- END OF FIX ---
+
         updateElevatorPosition(1, true); // Animate to floor 1
 
         PauseTransition waitAfterReset = new PauseTransition(Duration.millis(5000));
@@ -319,6 +364,7 @@ public class ElevatorPanel extends VBox {
 
         elevatorAnimation.setOnFinished(e -> {
             setDoorStatus(false);
+
             waitAfterReset.play();
         });
 
@@ -343,9 +389,9 @@ public class ElevatorPanel extends VBox {
 
         // First, check if the system is ON and not in FIRE mode.
         if (!system.isSystemRunning() || system.getSystemMode().equals("FIRE") || !isEnabled) {
-            PauseTransition checkAgain = new PauseTransition(Duration.millis(1000));
-            checkAgain.setOnFinished(e -> runNextMoveInSequence());
-            checkAgain.play();
+            checkAgainPause = new PauseTransition(Duration.millis(1000));
+            checkAgainPause.setOnFinished(e -> runNextMoveInSequence());
+            checkAgainPause.play();
             return;
         }
 
@@ -363,9 +409,9 @@ public class ElevatorPanel extends VBox {
         int targetFloor = automatedSequence[sequenceIndex];
         sequenceIndex++;
 
-
-        PauseTransition waitAtFloor = new PauseTransition(Duration.millis(2000));
-        PauseTransition waitAfterClose = new PauseTransition(Duration.millis(2000));
+        // Instantiate the class-level timers
+        waitAtFloor = new PauseTransition(Duration.millis(2000));
+        waitAfterClose = new PauseTransition(Duration.millis(2000));
 
 
         // After waiting 2 seconds (door closed), start the next move
