@@ -1,214 +1,133 @@
 package TestCode;
 
 public class Elevator {
-    public int CurrentFloor;
-    public int DestinationFloor;
-    public boolean moving;
-    public boolean doorOpen;
-    public String direction;
-    public String status;
-    public String mode;
+
+    public enum Status { ON, OFF }
+    public enum Mode { NORMAL, FIRE, AUTO }
+    public enum Direction { UP, DOWN, IDLE }
+
+    private static final int MIN_FLOOR = 1;
+    private static final int MAX_FLOOR = 10;
+
+    private int currentFloor;
+    private int destinationFloor;
+    private boolean moving;
+    private boolean doorOpen;
+    private Direction direction;
+    private Status status;
+    private Mode mode;
 
     public Elevator() {
-        CurrentFloor = 0;
-        DestinationFloor = 0;
-        moving = false;
-        doorOpen = false;
-        direction = "UP";
-        status = "ON";
-        mode = "NORMAL";
+        this.currentFloor = MIN_FLOOR;       // start at floor 1
+        this.destinationFloor = MIN_FLOOR;
+        this.moving = false;
+        this.doorOpen = false;
+        this.direction = Direction.IDLE;
+        this.status = Status.ON;
+        this.mode = Mode.NORMAL;
     }
 
-    /**
-     * Getter to return current floor the elevator is on
-     * @return the number of the floor
-     */
-    public int getCurrentFloor() { return CurrentFloor; }
-
-    /**
-     * Getter to return the destination the elevator is going to
-     * @return the number of the floor in the request
-     */
-    public int getDestinationFloor() { return DestinationFloor; }
-
-    /**
-     * Getter to return weather or not the elevator is moving
-     * @return boolean expression in moving variable
-     */
+    // -------- Getters
+    public int getCurrentFloor() { return currentFloor; }
+    public int getDestinationFloor() { return destinationFloor; }
     public boolean isMoving() { return moving; }
-
-    /**
-     * Getter to determine if the door is open/closed
-     * @return boolean in doorOpen variable
-     */
     public boolean isDoorOpen() { return doorOpen; }
+    public Direction getDirection() { return direction; }
+    public Status getStatus() { return status; }
+    public Mode getMode() { return mode; }
 
-    /**
-     * Getter to return the current set direction
-     * @return a string containing Up or down
-     */
-    public String getDirection() { return direction; }
-
-    /**
-     * Getter to return the status of the elevator
-     * @return "ON" and "OFF"
-     */
-    public String getStatus() { return status; }
-
-    /**
-     * Getter to return the current operating mode
-     * @return a string containing the mode (e.g., "NORMAL", "FIRE", "AUTO")
-     */
-    public String getMode() { return mode; }
-
-    /**
-     * Setter to change the floor
-     * @param floor the floor the elevator is currently at
-     */
-    public void setCurrentFloor(int floor) { CurrentFloor = floor; }
-
-    /**
-     * Setter to set status
-     * @param status "ON" and "OFF"
-     */
-    public void setStatus(String status) {
-        this.status = status;
-
-         // If we turn the elevator off:
-         // go down to first floor and open doors
-        if (status.equals("OFF")) {
-            if(CurrentFloor != 1){
-                try{
-                    request(1);
-                } catch (Exception e){
-                    String message = e.getMessage();
-                    System.out.println(message);
-                }
-                CurrentFloor = 1;
-            }
-            doorOpen = true;
-        }
-    }
-
-    /**
-     * Setter to set the operating mode
-     * @param mode "NORMAL", "FIRE", or "AUTO"
-     */
-    public void setMode(String mode) {
-        this.mode = mode;
-        if (mode.equals("FIRE_EMERGENCY")) {
-            // Fire mode
-            // all elevators go to the first floor
-            // all doors open
-            // all buttons are disabled
-            // request to first floor and open doors
-            if(CurrentFloor != 1){
-                try{
-                    request(1);
-                } catch (Exception e){
-                    String message = e.getMessage();
-                    System.out.println(message);
-                }
-                CurrentFloor = 1;
-            }
-            doorOpen = true;
-            moving = false; // Stop movement
-            direction = "DOWN";
-            this.status = "OFF";
-            System.out.println("Fire Mode");
-        } else if (mode.equals("AUTO")) {
-            // Auto mode requests are managed by a central system
-            System.out.println("Mode Auto");
-            this.status = "ON";
-        } else if (mode.equals("NORMAL")) {
-            this.status = "ON";
-            System.out.println("Mode Normal");
-        }
-    }
-
-    /**
-     * Setter to set the destination floor
-     * @param floor the floor number in the request
-     */
-    public void setDestinationFloor(int floor) { DestinationFloor = floor; }
-
-    /**
-     * Setter to change movement status
-     * @param moving true for elevator is moving, false otherwise
-     */
-    public void setMoving(boolean moving) { this.moving = moving; }
-
-    /**
-     * Setter to change door from open to close and vise versa
-     * @param doorOpen true for open, false otherwise
-     */
+    // -------- Controlled setters (internal safety)
+    public void setCurrentFloor(int floor) { this.currentFloor = floor; }
     public void setDoorOpen(boolean doorOpen) { this.doorOpen = doorOpen; }
+    public void setMoving(boolean moving) { this.moving = moving; }
+    public void setDirection(Direction direction) { this.direction = direction; }
+    public void setDestinationFloor(int floor) { this.destinationFloor = floor; }
+
+    public void setStatus(String statusText) {
+        Status newStatus = Status.valueOf(statusText.toUpperCase());
+        this.status = newStatus;
+
+        // If turned OFF: recall to 1st floor and open doors
+        if (this.status == Status.OFF) {
+            if (currentFloor != MIN_FLOOR) {
+                this.mode = Mode.NORMAL;
+                forceGoToFirstFloor();
+            }
+            doorOpen = true;
+            moving = false;
+            direction = Direction.IDLE;
+        }
+    }
+
+    public void setMode(String modeText) {
+        Mode newMode = Mode.valueOf(modeText.toUpperCase());
+        this.mode = newMode;
+
+        if (this.mode == Mode.FIRE) {
+            // Fire recall
+            forceGoToFirstFloor();
+            doorOpen = true;
+            moving = false;
+            direction = Direction.IDLE;
+            this.status = Status.ON; // powered but restricted
+        } else if (this.mode == Mode.AUTO) {
+            this.status = Status.ON;
+        } else {
+            this.status = Status.ON;
+        }
+    }
 
     /**
-     * Setter to assign direction
-     * @param direction "UP" or "DOWN"
-     */
-    public void setDirection(String direction) { this.direction = direction; }
-
-    /**
-     * Function to simulate a request
-     * @param destFloor the floor the elevator is going to
+     * Handle a floor request.
+     * @param destFloor desired floor (1..10)
+     * @throws Exception if invalid or not allowed in current mode/status
      */
     public void request(int destFloor) throws Exception {
-        // Prevent requests if the elevator is OFF or in FIRE mode
-        if (status.equals("OFF")) {
-            throw new Exception("Elevator is " + status + ". Request denied.");
-        }
-        if (mode.equals("FIRE")) {
-            if (destFloor != 1 || CurrentFloor == 1) {
-                throw new Exception("Elevator is in FIRE mode");
+        if (status == Status.OFF) throw new Exception("Elevator is OFF. Request denied.");
+        if (destFloor < MIN_FLOOR || destFloor > MAX_FLOOR) throw new Exception("Invalid Floor Number");
+
+        if (mode == Mode.FIRE) {
+            if (destFloor != MIN_FLOOR) throw new Exception("Elevator is in FIRE mode (only floor 1 allowed).");
+            if (currentFloor == MIN_FLOOR) {
+                doorOpen = true; moving = false; direction = Direction.IDLE; destinationFloor = MIN_FLOOR;
+                return;
             }
         }
 
-        // validate the requested floor
-        if(destFloor > 10 || destFloor < 1){
-            throw new Exception("Invalid Floor Number");
-        }
-
-        // if the requested floor is the current floor, open door
-        if (destFloor == CurrentFloor) {
-            doorOpen = true;
+        if (destFloor == currentFloor) {
+            doorOpen = true; moving = false; direction = Direction.IDLE; destinationFloor = currentFloor;
             return;
         }
 
-        // if door is open close it
-        if(isDoorOpen()) {
-            doorOpen = false;
-        }
-        // set destination floor
-        DestinationFloor = destFloor;
-
-        // set direction
-        if(DestinationFloor > CurrentFloor) {
-            direction = "UP";
-        } else if(DestinationFloor < CurrentFloor) {
-            direction = "DOWN";
-        }
-
-        // move the elevator
-        moveElevator();
+        if (doorOpen) doorOpen = false;
+        destinationFloor = destFloor;
+        direction = (destinationFloor > currentFloor) ? Direction.UP : Direction.DOWN;
+        moving = true;
     }
 
-    /**
-     * Move the elevator to the destination floor
-     */
+    /** Advance one floor toward destination (simulation step). */
     public void moveElevator() {
-        if (moving) {
-            if (direction.equals("UP")) {
-                CurrentFloor++;
-            } else if (direction.equals("DOWN")) {
-                CurrentFloor--;
-            }
-            // Check if reached destination
-            if (CurrentFloor == DestinationFloor) {
-                moving = false;
-                doorOpen = true;
-            }
+        if (!moving) return;
+
+        if (direction == Direction.UP) {
+            currentFloor = Math.min(currentFloor + 1, MAX_FLOOR);
+        } else if (direction == Direction.DOWN) {
+            currentFloor = Math.max(currentFloor - 1, MIN_FLOOR);
         }
+
+        if (currentFloor == destinationFloor) {
+            moving = false;
+            direction = Direction.IDLE;
+            doorOpen = true;
+        }
+    }
+
+    // -------- Helpers
+    private void forceGoToFirstFloor() {
+        doorOpen = false;
+        destinationFloor = MIN_FLOOR;
+        direction = (currentFloor > MIN_FLOOR) ? Direction.DOWN : Direction.IDLE;
+        moving = (currentFloor != MIN_FLOOR);
+        while (moving) moveElevator();
     }
 }
