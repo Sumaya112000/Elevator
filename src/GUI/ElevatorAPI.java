@@ -177,18 +177,6 @@ public class ElevatorAPI{
         }
         return ElevatorPanel.Direction.IDLE;
     }
-    /**
-     * Checks if a specific elevator is not locally in STOP button mode.
-     * @param elevatorId The elevator number (1-4)
-     * @return true if the elevator is enabled.
-     */
-    public boolean isElevatorEnabled(int elevatorId) {
-        int index = elevatorId - 1;
-        if (elevators != null && index >= 0 && index < elevators.length) {
-            return elevators[index].isEnabled();
-        }
-        return false;
-    }
 
     /**
      * Running elevator in a sequeunce to show elevators communicate with CC.
