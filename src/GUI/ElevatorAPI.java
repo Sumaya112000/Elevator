@@ -1,6 +1,5 @@
 package GUI;
-import java.util.HashMap;
-import java.util.Map;
+
 
 public class ElevatorAPI{
     private boolean systemRunning = true;

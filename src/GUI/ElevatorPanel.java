@@ -1,9 +1,7 @@
 package GUI;
 
 import javafx.animation.PauseTransition;
-import javafx.animation.SequentialTransition;
 import javafx.animation.TranslateTransition;
-import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -13,8 +11,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Polygon;
 import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
@@ -445,11 +441,4 @@ public class ElevatorPanel extends VBox {
         return this.currentDirection;
     }
 
-    /**
-     * Checking if a specific elevator is not in STOP mode.
-     * @return true if enabled.
-     */
-    public boolean isEnabled() {
-        return this.isEnabled;
-    }
 }
