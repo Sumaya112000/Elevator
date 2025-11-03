@@ -34,8 +34,10 @@ public class ElevatorPanel extends VBox {
     private int currentFloor;
     private Direction currentDirection = Direction.IDLE;
     private boolean isMoving = false;
-    private final ElevatorControlSystem system;
 
+    private final ElevatorAPI api;
+
+    private boolean isDoorOpen = false;
     private boolean isEnabled = true;
     private Button mainControlButton;
     private String btnText_START = "START";
@@ -48,7 +50,6 @@ public class ElevatorPanel extends VBox {
     private Pane carPane;
     private VBox movingCar;
     private Label carFloorLabel;
-
     private TranslateTransition elevatorAnimation;
     private PauseTransition waitAtFloor;
     private PauseTransition waitAfterClose;
@@ -65,9 +66,8 @@ public class ElevatorPanel extends VBox {
     private static final double TOTAL_FLOOR_HEIGHT = FLOOR_HEIGHT + FLOOR_SPACING;
     private static final double ANIMATION_SPEED_PER_FLOOR = 400.0;
 
-
     /**
-     * Shows the two small dots (up/down) next to each floor number.
+     * Elevator Call Buttons.
      */
     private class DualDotIndicatorPanel extends VBox {
         private Circle upDot = new Circle(3, Color.web("#505050"));
@@ -106,20 +106,17 @@ public class ElevatorPanel extends VBox {
         }
     }
 
+    /** Builds the visual parts of the elevator. **/
 
-    /**
-     * Builds the visual parts of a single elevator panel.
-     */
-    public ElevatorPanel(int id, ElevatorControlSystem system) {
+    public ElevatorPanel(int id, ElevatorAPI api) {
         super(3);
-        this.elevatorId = id;
-        this.system = system;
+        this.elevatorId =id;
+        this.api = api;
         setAlignment(Pos.CENTER);
         setStyle("-fx-background-color: #333333;");
         setPrefWidth(100);
 
         this.currentFloor = 1;
-
         isEnabled = true;
         String btnText = btnText_STOP;
         String btnColor = btnColor_STOP;
@@ -132,13 +129,10 @@ public class ElevatorPanel extends VBox {
         mainControlButton.setPrefWidth(90);
 
         mainControlButton.setOnAction(e -> {
-            if (system.getSystemMode().equals("INDEPENDENT")) {
+            if (api.getSystemMode().equals("INDEPENDENT") || api.getSystemMode().equals("CENTRALIZED")) {
                 toggleEnabledState();
-            } else {
-                System.out.println("Per-elevator START/STOP only works in INDEPENDENT mode.");
             }
         });
-
         HBox statusRow = new HBox(5);
         statusRow.setAlignment(Pos.CENTER_RIGHT);
         statusRow.setPrefWidth(90);
@@ -151,8 +145,6 @@ public class ElevatorPanel extends VBox {
         statusRow.getChildren().addAll(currentFloorDisplay, directionIndicator);
 
         getChildren().addAll(title, mainControlButton, statusRow);
-
-
         shaftPane = new StackPane();
         floorButtonColumn = new VBox(FLOOR_SPACING);
         carPane = new Pane();
@@ -186,7 +178,7 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Creates one floor row (the dots and the floor number).
+     * Creates one floor row (the elevator call button and the floor number).
      */
     private HBox createFloorRow(int floor) {
         HBox row = new HBox(5);
@@ -206,7 +198,7 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Flips the local START/STOP button for this elevator.
+     * Changing Start/Stop status of individual elevator.
      */
     private void toggleEnabledState() {
         isEnabled = !isEnabled;
@@ -220,7 +212,7 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Called by the main system when the global mode changes.
+     * Changing Modes of elevator(Centralized, Independent) from buttons.
      */
     public void onSystemModeChange(String newMode) {
         if (newMode.equals("CENTRALIZED")) {
@@ -231,7 +223,7 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Moves the elevator car to a new floor, with or without animation.
+     * Moves the elevator car to a new floor.
      */
     private void updateElevatorPosition(int newFloor, boolean animate) {
         double targetY = (10 - newFloor) * TOTAL_FLOOR_HEIGHT;
@@ -250,9 +242,12 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Changes the elevator car's border to show if doors are open (white) or closed (black).
+     * Know Door open/close status.
+     * White Border = Open
+     * Black Border = Close
      */
     public void setDoorStatus(boolean open) {
+        this.isDoorOpen = open;
         String borderColor = open ? "white" : "black";
         movingCar.setStyle(
                 "-fx-background-color: #606060;" +
@@ -260,9 +255,8 @@ public class ElevatorPanel extends VBox {
                         "-fx-border-width: 0 2 0 2;"
         );
     }
-
     /**
-     * Changes the direction arrows (up, down, or idle).
+     * Changes the direction arrows.
      */
     public void setDirection(Direction newDirection) {
         this.currentDirection = newDirection;
@@ -278,7 +272,6 @@ public class ElevatorPanel extends VBox {
             indicator.setDotLit(direction, lit);
         }
     }
-
     /**
      * Stops all running animations and pauses to prevent race conditions.
      */
@@ -290,7 +283,8 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Used by FIRE mode to force the elevator to floor 1 and hold doors open.
+     * FIRE Mode
+     * Forces Elevators to go floor 1 and have doors open.
      */
     public void forceMoveAndOpen(int targetFloor) {
         stopAllTimers();
@@ -312,12 +306,12 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Used to release the elevator from FIRE mode.
+     * Clear Fire Mode
      */
     public void releaseAndClose() {
         stopAllTimers();
         setDoorStatus(false);
-        isMoving = false;
+        isMoving = false; // Release the lock
 
         PauseTransition restartPause = new PauseTransition(Duration.millis(2000));
         restartPause.setOnFinished(e -> {
@@ -331,7 +325,7 @@ public class ElevatorPanel extends VBox {
      * Animates the car back to Floor 1, waits 5 seconds, then starts the loop.
      */
     public void forceReset() {
-        stopAllTimers();
+        stopAllTimers(); // Stop any in-progress loops
 
         isMoving = true;
         isEnabled = true;
@@ -339,8 +333,9 @@ public class ElevatorPanel extends VBox {
         mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
 
         setDirection(Direction.IDLE);
-        setDoorStatus(false);
-        updateElevatorPosition(1, true);
+        setDoorStatus(false); // Immediately close door
+
+        updateElevatorPosition(1, true); // Animate to floor 1
 
         PauseTransition waitAfterReset = new PauseTransition(Duration.millis(5000));
 
@@ -363,6 +358,8 @@ public class ElevatorPanel extends VBox {
     public void startAutomatedLoop(int[] sequence) {
         this.automatedSequence = sequence;
         this.sequenceIndex = 0;
+
+        // This makes the elevator start its loop immediately on startup.
         runNextMoveInSequence();
     }
 
@@ -371,15 +368,11 @@ public class ElevatorPanel extends VBox {
      */
     private void runNextMoveInSequence() {
 
-        if (!system.isSystemRunning() || system.getSystemMode().equals("FIRE") || !isEnabled) {
+
+        if (!api.isSystemRunning() || api.getSystemMode().equals("FIRE") || !isEnabled) {
             checkAgainPause = new PauseTransition(Duration.millis(1000));
             checkAgainPause.setOnFinished(e -> runNextMoveInSequence());
             checkAgainPause.play();
-            return;
-        }
-
-        if (automatedSequence == null) {
-            System.err.println("Error: Elevator " + elevatorId + " has no automated sequence.");
             return;
         }
 
@@ -393,7 +386,6 @@ public class ElevatorPanel extends VBox {
 
         waitAtFloor = new PauseTransition(Duration.millis(2000));
         waitAfterClose = new PauseTransition(Duration.millis(2000));
-
 
         waitAfterClose.setOnFinished(e -> {
             isMoving = false;
@@ -411,7 +403,6 @@ public class ElevatorPanel extends VBox {
             waitAtFloor.play();
         });
 
-
         if (targetFloor == currentFloor) {
             setDoorStatus(true);
             waitAtFloor.play();
@@ -420,5 +411,45 @@ public class ElevatorPanel extends VBox {
             updateElevatorPosition(targetFloor, true);
             elevatorAnimation.play();
         }
+    }
+
+    /**
+     * Returns the elevator's current floor.
+     * @return An integer (1-10)
+     */
+    public int getCurrentFloor() {
+        return this.currentFloor;
+    }
+
+    /**
+     * Checks if the elevator is currently moving.
+     * @return true if moving, false if stopped.
+     */
+    public boolean isMoving() {
+        return this.isMoving;
+    }
+
+    /**
+     * Checks if the elevator door is currently open.
+     * @return true if the door is open.
+     */
+    public boolean isDoorOpen() {
+        return this.isDoorOpen;
+    }
+
+    /**
+     * Returns the elevator current direction.
+     * @return Direction enum
+     */
+    public ElevatorPanel.Direction getCurrentDirection() {
+        return this.currentDirection;
+    }
+
+    /**
+     * Checking if a specific elevator is not in STOP mode.
+     * @return true if enabled.
+     */
+    public boolean isEnabled() {
+        return this.isEnabled;
     }
 }

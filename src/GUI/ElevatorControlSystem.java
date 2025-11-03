@@ -1,4 +1,5 @@
 package GUI;
+
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -10,27 +11,26 @@ import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 
 /**
- * This is the main class that starts the whole application.
- * It builds the window and acts like the "boss" for all the
- * elevator panels and control buttons.
+ * Starts the whole application.
+ * It builds the window and communicates with elevator panels and control buttons.
  */
 public class ElevatorControlSystem extends Application {
 
-    private String systemMode = "CENTRALIZED";
-    private boolean systemRunning = true;
-
+    private ElevatorAPI api;
     private ElevatorPanel[] elevators = new ElevatorPanel[4];
     private CommandPanel commandPanel;
 
     /**
-     * This method sets up and shows the main window when the app starts.
+     * sets up and shows the main window when the app starts.
      */
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Command Center");
 
+        this.api = new ElevatorAPI();
+
         BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #333333;"); // Dark Gray
+        root.setStyle("-fx-background-color: #333333;");
 
         Label titleLabel = new Label("Command Center");
         titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
@@ -43,7 +43,7 @@ public class ElevatorControlSystem extends Application {
         elevatorContainer.setPadding(new Insets(10));
 
         for (int i = 0; i < 4; i++) {
-            elevators[i] = new ElevatorPanel(i + 1, this);
+            elevators[i] = new ElevatorPanel(i + 1, api);
             elevatorContainer.getChildren().add(elevators[i]);
         }
 
@@ -51,23 +51,26 @@ public class ElevatorControlSystem extends Application {
         centerWrapper.setStyle("-fx-background-color: #333333;");
         root.setCenter(centerWrapper);
 
-        commandPanel = new CommandPanel(this, elevators);
+        commandPanel = new CommandPanel(api);
         root.setRight(commandPanel);
 
-        // Set up the buttons and labels for the first time
-        setInitialUIState();
+        api.registerElevators(elevators);
+        api.registerCommandPanel(commandPanel);
 
-        // Give each elevator its list of floors to visit
+        // Start the background logging thread
+        startLoggingThread(api);
+
+        api.setInitialUIState();
+
         int[] seq1 = {1, 8, 10, 4, 7, 1};
         int[] seq2 = {1, 9, 1, 6, 10, 2};
         int[] seq3 = {8, 1, 4, 7, 2, 9};
         int[] seq4 = {10, 5, 2, 6, 3, 1};
 
-        // Tell the elevators to start their automatic loops
-        elevators[0].startAutomatedLoop(seq1);
-        elevators[1].startAutomatedLoop(seq2);
-        elevators[2].startAutomatedLoop(seq3);
-        elevators[3].startAutomatedLoop(seq4);
+        api.setAndStartElevatorSequence(1, seq1);
+        api.setAndStartElevatorSequence(2, seq2);
+        api.setAndStartElevatorSequence(3, seq3);
+        api.setAndStartElevatorSequence(4, seq4);
 
         Scene scene = new Scene(root);
         primaryStage.setScene(scene);
@@ -75,68 +78,45 @@ public class ElevatorControlSystem extends Application {
     }
 
     /**
-     * Changes the system's main mode (like "CENTRALIZED" or "FIRE").
+     * Printing Status of Elevators using API.
      */
-    public void setSystemMode(String mode) {
-        this.systemMode = mode;
-        for (ElevatorPanel elevator : elevators) {
-            elevator.onSystemModeChange(mode);
-        }
-        System.out.println("System Mode Changed to: " + mode);
-    }
+    public void startLoggingThread(ElevatorAPI api) {
+        Runnable loggingTask = () -> {
+            try {
+                while (true) {
+                    StringBuilder log = new StringBuilder();
+                    log.append("\n--- ELEVATOR STATUS LOG ---\n");
+                    log.append(String.format("System Mode: %s | System Running: %s\n",
+                            api.getSystemMode(), api.isSystemRunning()));
 
-    /**
-     * Gets the system's current mode.
-     */
-    public String getSystemMode() {
-        return systemMode;
-    }
+                    for (int i = 1; i <= 4; i++) {
+                        log.append(String.format(
+                                "  [Elev %d] Floor: %-2d | Door: %-6s | Moving: %-5s | Dir: %-4s\n",
+                                i,
+                                api.getElevatorFloor(i),
+                                api.isElevatorDoorOpen(i) ? "OPEN" : "CLOSED",
+                                api.isElevatorMoving(i) ? "Yes" : "No",
+                                api.getElevatorDirection(i)
+                        ));
+                    }
+                    log.append("-----------------------------\n");
 
-    /**
-     * Turns the whole system "ON" (running) or "OFF" (stopped).
-     */
-    public void setSystemRunning(boolean running) {
-        this.systemRunning = running;
-        if (commandPanel != null) {
-            commandPanel.updateButtonStates(running);
-        }
-        System.out.println("System Power State: " + (running ? "ON" : "OFF"));
-    }
+                    System.out.println(log.toString());
+                    Thread.sleep(5000);
+                }
+            } catch (InterruptedException e) {
+                System.out.println("Logging thread interrupted.");
+            }
+        };
 
-    /**
-     * Checks if the system is currently "ON".
-     */
-    public boolean isSystemRunning() {
-        return systemRunning;
-    }
-
-    /**
-     * Sets up the control buttons and labels to their starting look.
-     */
-    public void setInitialUIState() {
-        setSystemMode("CENTRALIZED");
-        setSystemRunning(true);
-
-        if (commandPanel != null) {
-            commandPanel.updateForReset();
-        }
+        Thread loggingThread = new Thread(loggingTask);
+        loggingThread.setDaemon(true);
+        loggingThread.start();
     }
 
 
     /**
-     * This is called when the user clicks the "RESET" button.
-     * It resets the buttons and tells all elevators to go to floor 1.
-     */
-    public void resetSystemToInitialState() {
-        setInitialUIState();
-
-        for (ElevatorPanel elevator : elevators) {
-            elevator.forceReset();
-        }
-    }
-
-    /**
-     * This is the main starting point that launches the application.
+     * Launching the application.
      */
     public static void main(String[] args) {
         launch(args);
