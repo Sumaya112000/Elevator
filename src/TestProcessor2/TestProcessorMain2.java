@@ -1,6 +1,6 @@
 package TestProcessor2;
 
-import Bus.SoftwareBus;
+import bus.SoftwareBus;
 import TestProcessor1.TestProcessorDisplay1;
 import javafx.application.Application;
 import javafx.application.Platform;
