@@ -1,4 +1,4 @@
-package Bus;
+package bus;
 
 import Message.Message;
 

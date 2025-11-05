@@ -1,6 +1,6 @@
 package TestProcessor2;
 
-import Bus.SoftwareBus;
+import bus.SoftwareBus;
 import Message.Message;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
