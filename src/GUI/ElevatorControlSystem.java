@@ -9,6 +9,8 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
+import bus.SoftwareBus;
+
 
 /**
  * Starts the whole application.
@@ -26,7 +28,7 @@ public class ElevatorControlSystem extends Application {
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Command Center");
-
+        SoftwareBus busServer = new SoftwareBus(true);
         this.api = new ElevatorAPI();
 
         BorderPane root = new BorderPane();
@@ -121,4 +123,6 @@ public class ElevatorControlSystem extends Application {
     public static void main(String[] args) {
         launch(args);
     }
+
+    private SoftwareBus busServer;
 }
