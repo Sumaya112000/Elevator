@@ -9,27 +9,31 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
+
 import bus.SoftwareBus;
 
-
 /**
- * Starts the whole application.
- * It builds the window and communicates with elevator panels and control buttons.
+ * Hosts the Command Center window and starts the BUS server.
+ * - Starts one SoftwareBus(true) server.
+ * - Creates one client for the CommandPanel to publish system-wide commands.
+ * - Each ElevatorPanel creates its own client and subscribes to topics.
  */
 public class ElevatorControlSystem extends Application {
 
-    private ElevatorAPI api;
-    private ElevatorPanel[] elevators = new ElevatorPanel[4];
+    private SoftwareBus busServer;   // server socket
+    private SoftwareBus ccClient;    // command panel's publisher client
+    private ElevatorPanel[] elevators;
     private CommandPanel commandPanel;
 
-    /**
-     * sets up and shows the main window when the app starts.
-     */
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Command Center");
-        SoftwareBus busServer = new SoftwareBus(true);
-        this.api = new ElevatorAPI();
+
+        // Start BUS server
+        busServer = new SoftwareBus(true);
+
+        // Client for the right-side command panel
+        ccClient = new SoftwareBus(false);
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #333333;");
@@ -40,89 +44,26 @@ public class ElevatorControlSystem extends Application {
         titlePane.setPadding(new Insets(10));
         root.setTop(titleLabel);
 
+        // Center: 4 elevators
         HBox elevatorContainer = new HBox(15);
         elevatorContainer.setAlignment(Pos.TOP_CENTER);
         elevatorContainer.setPadding(new Insets(10));
 
+        elevators = new ElevatorPanel[4];
         for (int i = 0; i < 4; i++) {
-            elevators[i] = new ElevatorPanel(i + 1, api);
+            elevators[i] = new ElevatorPanel(i + 1); // each panel makes its own client + subscriptions
             elevatorContainer.getChildren().add(elevators[i]);
         }
+        root.setCenter(new StackPane(elevatorContainer));
 
-        StackPane centerWrapper = new StackPane(elevatorContainer);
-        centerWrapper.setStyle("-fx-background-color: #333333;");
-        root.setCenter(centerWrapper);
-
-        commandPanel = new CommandPanel(api);
+        // Right: command stack (publishes over bus)
+        commandPanel = new CommandPanel(ccClient);
         root.setRight(commandPanel);
 
-        api.registerElevators(elevators);
-        api.registerCommandPanel(commandPanel);
-
-        // Start the background logging thread
-        startLoggingThread(api);
-
-        api.setInitialUIState();
-
-        int[] seq1 = {1, 8, 10, 4, 7, 1};
-        int[] seq2 = {1, 9, 1, 6, 10, 2};
-        int[] seq3 = {8, 1, 4, 7, 2, 9};
-        int[] seq4 = {10, 5, 2, 6, 3, 1};
-
-        api.setAndStartElevatorSequence(1, seq1);
-        api.setAndStartElevatorSequence(2, seq2);
-        api.setAndStartElevatorSequence(3, seq3);
-        api.setAndStartElevatorSequence(4, seq4);
-
-        Scene scene = new Scene(root);
+        Scene scene = new Scene(root, 1200, 720);
         primaryStage.setScene(scene);
         primaryStage.show();
     }
 
-    /**
-     * Printing Status of Elevators using API.
-     */
-    public void startLoggingThread(ElevatorAPI api) {
-        Runnable loggingTask = () -> {
-            try {
-                while (true) {
-                    StringBuilder log = new StringBuilder();
-                    log.append("\n--- ELEVATOR STATUS LOG ---\n");
-                    log.append(String.format("System Mode: %s | System Running: %s\n",
-                            api.getSystemMode(), api.isSystemRunning()));
-
-                    for (int i = 1; i <= 4; i++) {
-                        log.append(String.format(
-                                "  [Elev %d] Floor: %-2d | Door: %-6s | Moving: %-5s | Dir: %-4s\n",
-                                i,
-                                api.getElevatorFloor(i),
-                                api.isElevatorDoorOpen(i) ? "OPEN" : "CLOSED",
-                                api.isElevatorMoving(i) ? "Yes" : "No",
-                                api.getElevatorDirection(i)
-                        ));
-                    }
-                    log.append("-----------------------------\n");
-
-                    System.out.println(log.toString());
-                    Thread.sleep(5000);
-                }
-            } catch (InterruptedException e) {
-                System.out.println("Logging thread interrupted.");
-            }
-        };
-
-        Thread loggingThread = new Thread(loggingTask);
-        loggingThread.setDaemon(true);
-        loggingThread.start();
-    }
-
-
-    /**
-     * Launching the application.
-     */
-    public static void main(String[] args) {
-        launch(args);
-    }
-
-    private SoftwareBus busServer;
+    public static void main(String[] args) { launch(args); }
 }
