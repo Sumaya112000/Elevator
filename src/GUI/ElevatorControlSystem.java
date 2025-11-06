@@ -1,6 +1,7 @@
 package GUI;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
@@ -60,22 +61,65 @@ public class ElevatorControlSystem extends Application {
         // Start the background logging thread
         startLoggingThread(api);
 
+        // Start the test harness
+        startTestHarness(api);
+
+        // Set the initial UI state (buttons, etc.)
         api.setInitialUIState();
 
-        int[] seq1 = {1, 8, 10, 4, 7, 1};
-        int[] seq2 = {1, 9, 1, 6, 10, 2};
-        int[] seq3 = {8, 1, 4, 7, 2, 9};
-        int[] seq4 = {10, 5, 2, 6, 3, 1};
-
-        api.setAndStartElevatorSequence(1, seq1);
-        api.setAndStartElevatorSequence(2, seq2);
-        api.setAndStartElevatorSequence(3, seq3);
-        api.setAndStartElevatorSequence(4, seq4);
+        // Elevators will now wait for commands from the test harness.
 
         Scene scene = new Scene(root);
         primaryStage.setScene(scene);
         primaryStage.show();
     }
+
+    /**
+     * Test harness.
+     * Running Commands to test the API.
+     */
+    public void startTestHarness(ElevatorAPI api) {
+        Runnable testTask = () -> {
+            try {
+                // Wait for 5 seconds for the app to start
+                Thread.sleep(5000);
+
+                // Picking a specific elevator to go to specific floor
+                Platform.runLater(() -> api.sendFloorRequest(1, 10));
+                Thread.sleep(2000);
+                Platform.runLater(() -> api.sendFloorRequest(2, 4));
+                Thread.sleep(2000);
+                Platform.runLater(() -> api.sendFloorRequest(3, 6));
+                Thread.sleep(2000);
+                Platform.runLater(() -> api.sendFloorRequest(4, 9));
+
+                Thread.sleep(7000);
+
+                //  TESTFIRE Button Working?
+                Platform.runLater(() -> api.sendFireCommand());
+                Thread.sleep(7000);
+
+                // CLEAR FIRE Button Working?
+                Platform.runLater(() -> api.sendClearFireCommand());
+                Thread.sleep(1000);
+
+                //Stop Button Working?
+                Platform.runLater(() -> api.sendStopCommand());
+                Thread.sleep(2000); // Wait 2s
+
+                // START Button Working?
+                Platform.runLater(() -> api.sendStartCommand());
+                Thread.sleep(1000);
+
+            } catch (InterruptedException e) {
+                System.out.println("[Test harness interrupted.");
+            }
+        };
+        Thread testThread = new Thread(testTask);
+        testThread.setDaemon(true);
+        testThread.start();
+    }
+
 
     /**
      * Printing Status of Elevators using API.
@@ -85,7 +129,7 @@ public class ElevatorControlSystem extends Application {
             try {
                 while (true) {
                     StringBuilder log = new StringBuilder();
-                    log.append("\n--- ELEVATOR STATUS LOG ---\n");
+                    log.append("\nELEVATOR STATUS LOG \n");
                     log.append(String.format("System Mode: %s | System Running: %s\n",
                             api.getSystemMode(), api.isSystemRunning()));
 
@@ -99,10 +143,9 @@ public class ElevatorControlSystem extends Application {
                                 api.getElevatorDirection(i)
                         ));
                     }
-                    log.append("-----------------------------\n");
 
                     System.out.println(log.toString());
-                    Thread.sleep(5000);
+                    Thread.sleep(5000); // Log every 5 seconds
                 }
             } catch (InterruptedException e) {
                 System.out.println("Logging thread interrupted.");

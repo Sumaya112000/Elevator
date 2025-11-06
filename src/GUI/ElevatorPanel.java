@@ -2,6 +2,7 @@ package GUI;
 
 import javafx.animation.PauseTransition;
 import javafx.animation.TranslateTransition;
+import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -18,9 +19,7 @@ import javafx.geometry.Insets;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * This class represents a single elevator.
- * It manages the visual car, the buttons for each floor,
- * and the automatic movement loop.
+ * Manages all the visuals and logic for a single elevator.
  */
 public class ElevatorPanel extends VBox {
 
@@ -30,7 +29,6 @@ public class ElevatorPanel extends VBox {
     private int currentFloor;
     private Direction currentDirection = Direction.IDLE;
     private boolean isMoving = false;
-
     private final ElevatorAPI api;
 
     private boolean isDoorOpen = false;
@@ -46,13 +44,12 @@ public class ElevatorPanel extends VBox {
     private Pane carPane;
     private VBox movingCar;
     private Label carFloorLabel;
+
     private TranslateTransition elevatorAnimation;
     private PauseTransition waitAtFloor;
     private PauseTransition waitAfterClose;
     private PauseTransition checkAgainPause;
 
-    private int[] automatedSequence;
-    private int sequenceIndex = 0;
     private final ConcurrentHashMap<Integer, DualDotIndicatorPanel> floorCallIndicators = new ConcurrentHashMap<>();
     private final DirectionIndicatorPanel directionIndicator;
     private final Label currentFloorDisplay;
@@ -63,30 +60,44 @@ public class ElevatorPanel extends VBox {
     private static final double ANIMATION_SPEED_PER_FLOOR = 400.0;
 
     /**
-     * Elevator Call Buttons.
+     * The call buttons (dots) for each floor.
      */
     private class DualDotIndicatorPanel extends VBox {
         private Circle upDot = new Circle(3, Color.web("#505050"));
         private Circle downDot = new Circle(3, Color.web("#505050"));
+
+        /**
+         * Creates the two dots.
+         */
         public DualDotIndicatorPanel(int floor, ElevatorPanel parentPanel) {
             super(6);
             getChildren().addAll(upDot, downDot);
             setAlignment(Pos.CENTER);
             setPadding(new Insets(0, 5, 0, 5));
         }
+
+        /**
+         * Lights up the dot (or turns it off).
+         */
         public void setDotLit(Direction direction, boolean lit) {
             Color color = lit ? Color.WHITE : Color.web("#505050");
-            if (direction == Direction.UP) upDot.setFill(color);
-            else if (direction == Direction.DOWN) downDot.setFill(color);
+            Platform.runLater(() -> {
+                if (direction == Direction.UP) upDot.setFill(color);
+                else if (direction == Direction.DOWN) downDot.setFill(color);
+            });
         }
     }
 
     /**
-     * Shows the up and down arrows at the top of the elevator.
+     * The direction arrows (triangles) at the top.
      */
     private class DirectionIndicatorPanel extends VBox {
         private Polygon upTriangle, downTriangle;
         private final Color UNLIT_COLOR = Color.BLACK;
+
+        /**
+         * Creates the two triangles.
+         */
         public DirectionIndicatorPanel() {
             super(6);
             upTriangle = new Polygon(6.0, 0.0, 0.0, 8.0, 12.0, 8.0);
@@ -96,17 +107,24 @@ public class ElevatorPanel extends VBox {
             setAlignment(Pos.CENTER);
             setPadding(new Insets(5));
         }
+
+        /**
+         * Lights up the correct arrow.
+         */
         public void setDirection(Direction newDirection) {
-            upTriangle.setFill(newDirection == Direction.UP ? Color.WHITE : UNLIT_COLOR);
-            downTriangle.setFill(newDirection == Direction.DOWN ? Color.WHITE : UNLIT_COLOR);
+            Platform.runLater(() -> {
+                upTriangle.setFill(newDirection == Direction.UP ? Color.WHITE : UNLIT_COLOR);
+                downTriangle.setFill(newDirection == Direction.DOWN ? Color.WHITE : UNLIT_COLOR);
+            });
         }
     }
 
-    /** Builds the visual parts of the elevator. **/
-
+    /**
+     * Builds the visual parts of the elevator.
+     */
     public ElevatorPanel(int id, ElevatorAPI api) {
         super(3);
-        this.elevatorId =id;
+        this.elevatorId = id;
         this.api = api;
         setAlignment(Pos.CENTER);
         setStyle("-fx-background-color: #333333;");
@@ -174,7 +192,7 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Creates one floor row (the elevator call button and the floor number).
+     * Creates one row (dots and number) for the shaft.
      */
     private HBox createFloorRow(int floor) {
         HBox row = new HBox(5);
@@ -194,63 +212,72 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Changing Start/Stop status of individual elevator.
+     * Flips the local START/STOP button.
      */
     private void toggleEnabledState() {
         isEnabled = !isEnabled;
-        if (isEnabled) {
-            mainControlButton.setText(btnText_STOP);
-            mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
-        } else {
-            mainControlButton.setText(btnText_START);
-            mainControlButton.setStyle(btnColor_START + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
-        }
+        Platform.runLater(() -> {
+            if (isEnabled) {
+                mainControlButton.setText(btnText_STOP);
+                mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
+            } else {
+                mainControlButton.setText(btnText_START);
+                mainControlButton.setStyle(btnColor_START + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
+            }
+        });
     }
 
     /**
-     * Changing Modes of elevator(Centralized, Independent) from buttons.
+     * Updates the local START/STOP button from the API.
      */
     public void onSystemModeChange(String newMode) {
         if (newMode.equals("CENTRALIZED")) {
             isEnabled = true;
-            mainControlButton.setText(btnText_STOP);
-            mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
+            Platform.runLater(() -> {
+                mainControlButton.setText(btnText_STOP);
+                mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
+            });
         }
     }
 
     /**
-     * Moves the elevator car to a new floor.
+     * Moves the elevator car visuals.
      */
     private void updateElevatorPosition(int newFloor, boolean animate) {
         double targetY = (10 - newFloor) * TOTAL_FLOOR_HEIGHT;
         int floorsToTravel = Math.abs(newFloor - this.currentFloor);
         this.currentFloor = newFloor;
 
-        this.currentFloorDisplay.setText(String.valueOf(newFloor));
-        this.carFloorLabel.setText(String.valueOf(newFloor));
 
-        if (animate) {
-            elevatorAnimation.setDuration(Duration.millis(floorsToTravel * ANIMATION_SPEED_PER_FLOOR));
-            elevatorAnimation.setToY(targetY);
-        } else {
-            movingCar.setTranslateY(targetY);
-        }
+        Platform.runLater(() -> {
+            this.currentFloorDisplay.setText(String.valueOf(newFloor));
+            this.carFloorLabel.setText(String.valueOf(newFloor));
+
+            if (animate) {
+                elevatorAnimation.setDuration(Duration.millis(floorsToTravel * ANIMATION_SPEED_PER_FLOOR));
+                elevatorAnimation.setToY(targetY);
+                elevatorAnimation.play();
+            } else {
+                movingCar.setTranslateY(targetY);
+            }
+        });
     }
 
     /**
-     * Know Door open/close status.
-     * White Border = Open
-     * Black Border = Close
+     * Changes the car border (white=open, black=closed).
      */
     public void setDoorStatus(boolean open) {
         this.isDoorOpen = open;
         String borderColor = open ? "white" : "black";
-        movingCar.setStyle(
-                "-fx-background-color: #606060;" +
-                        "-fx-border-color: " + borderColor + ";" +
-                        "-fx-border-width: 0 2 0 2;"
-        );
+        String style = "-fx-background-color: #606060;" +
+                "-fx-border-color: " + borderColor + ";" +
+                "-fx-border-width: 0 2 0 2;";
+
+        Platform.runLater(() -> {
+            movingCar.setStyle(style);
+        });
     }
+
     /**
      * Changes the direction arrows.
      */
@@ -260,7 +287,7 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Turns the floor call dots on or off.
+     * Lights up the call dots.
      */
     public void lightExternalCall(int floor, Direction direction, boolean lit) {
         DualDotIndicatorPanel indicator = floorCallIndicators.get(floor);
@@ -268,177 +295,163 @@ public class ElevatorPanel extends VBox {
             indicator.setDotLit(direction, lit);
         }
     }
+
     /**
-     * Stops all running animations and pauses to prevent race conditions.
+     * Stops all animations and pauses.
      */
     private void stopAllTimers() {
-        elevatorAnimation.stop();
-        if (waitAtFloor != null) waitAtFloor.stop();
-        if (waitAfterClose != null) waitAfterClose.stop();
-        if (checkAgainPause != null) checkAgainPause.stop();
+
+        Platform.runLater(() -> {
+            elevatorAnimation.stop();
+            if (waitAtFloor != null) waitAtFloor.stop();
+            if (waitAfterClose != null) waitAfterClose.stop();
+            if (checkAgainPause != null) checkAgainPause.stop();
+        });
     }
 
     /**
-     * FIRE Mode
-     * Forces Elevators to go floor 1 and have doors open.
+     * FIRE mode: forces elevator to floor 1.
      */
     public void forceMoveAndOpen(int targetFloor) {
-        stopAllTimers();
-        isMoving = true;
-        setDirection(Direction.IDLE);
-        setDoorStatus(false);
 
-        if (targetFloor == currentFloor) {
-            setDoorStatus(true);
+        Platform.runLater(() -> {
+            stopAllTimers();
             isMoving = true;
-        } else {
-            updateElevatorPosition(targetFloor, true);
-            elevatorAnimation.setOnFinished(e -> {
+            setDirection(Direction.IDLE);
+            setDoorStatus(false);
+
+            if (targetFloor == currentFloor) {
                 setDoorStatus(true);
                 isMoving = true;
-            });
-            elevatorAnimation.play();
-        }
+            } else {
+                elevatorAnimation.setOnFinished(e -> {
+                    setDoorStatus(true);
+                    isMoving = true;
+                });
+                updateElevatorPosition(targetFloor, true);
+            }
+        });
     }
 
     /**
-     * Clear Fire Mode
+     * CLEAR FIRE mode: closes door and idles.
      */
     public void releaseAndClose() {
-        stopAllTimers();
-        setDoorStatus(false);
-        isMoving = false; // Release the lock
 
-        PauseTransition restartPause = new PauseTransition(Duration.millis(2000));
-        restartPause.setOnFinished(e -> {
-            runNextMoveInSequence();
+        Platform.runLater(() -> {
+            stopAllTimers();
+            setDoorStatus(false);
+            isMoving = false;
         });
-        restartPause.play();
     }
 
     /**
-     * Called by the main system's RESET button.
-     * Animates the car back to Floor 1, waits 5 seconds, then starts the loop.
+     * RESET button: forces elevator to floor 1, waits 5s.
      */
     public void forceReset() {
-        stopAllTimers(); // Stop any in-progress loops
 
-        isMoving = true;
-        isEnabled = true;
-        mainControlButton.setText(btnText_STOP);
-        mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
+        Platform.runLater(() -> {
+            stopAllTimers();
 
-        setDirection(Direction.IDLE);
-        setDoorStatus(false); // Immediately close door
+            isMoving = true;
+            isEnabled = true;
+            mainControlButton.setText(btnText_STOP);
+            mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
 
-        updateElevatorPosition(1, true); // Animate to floor 1
-
-        PauseTransition waitAfterReset = new PauseTransition(Duration.millis(5000));
-
-        waitAfterReset.setOnFinished(e -> {
-            isMoving = false;
-            runNextMoveInSequence();
-        });
-
-        elevatorAnimation.setOnFinished(e -> {
+            setDirection(Direction.IDLE);
             setDoorStatus(false);
-            waitAfterReset.play();
+
+            PauseTransition waitAfterReset = new PauseTransition(Duration.millis(5000));
+            waitAfterReset.setOnFinished(e -> {
+                isMoving = false;
+            });
+
+            elevatorAnimation.setOnFinished(e -> {
+                setDoorStatus(false);
+                waitAfterReset.play();
+            });
+
+            updateElevatorPosition(1, true);
         });
-
-        elevatorAnimation.play();
     }
 
-    /**
-     * Gives the elevator its list of floors to visit in its loop.
-     */
-    public void startAutomatedLoop(int[] sequence) {
-        this.automatedSequence = sequence;
-        this.sequenceIndex = 0;
-
-        // This makes the elevator start its loop immediately on startup.
-        runNextMoveInSequence();
-    }
 
     /**
-     * This is the core "loop" that makes the elevator move automatically.
+     * Sending Elevator to specific floor.
      */
-    private void runNextMoveInSequence() {
-
+    public void requestFloor(int targetFloor) {
 
         if (!api.isSystemRunning() || api.getSystemMode().equals("FIRE") || !isEnabled) {
-            checkAgainPause = new PauseTransition(Duration.millis(1000));
-            checkAgainPause.setOnFinished(e -> runNextMoveInSequence());
-            checkAgainPause.play();
+            System.out.println("ELEV " + elevatorId + ": Request to "
+                    + targetFloor + " denied (system offline or FIRE).");
             return;
         }
-
-        isMoving = true;
-
-        if (sequenceIndex >= automatedSequence.length) {
-            sequenceIndex = 0;
-        }
-        int targetFloor = automatedSequence[sequenceIndex];
-        sequenceIndex++;
-
-        waitAtFloor = new PauseTransition(Duration.millis(2000));
-        waitAfterClose = new PauseTransition(Duration.millis(2000));
-
-        waitAfterClose.setOnFinished(e -> {
-            isMoving = false;
-            runNextMoveInSequence();
-        });
-
-        waitAtFloor.setOnFinished(e -> {
-            setDoorStatus(false);
-            waitAfterClose.play();
-        });
-
-        elevatorAnimation.setOnFinished(e -> {
-            setDirection(Direction.IDLE);
-            setDoorStatus(true);
-            waitAtFloor.play();
-        });
-
         if (targetFloor == currentFloor) {
-            setDoorStatus(true);
-            waitAtFloor.play();
-        } else {
-            setDirection(targetFloor > currentFloor ? Direction.UP : Direction.DOWN);
-            updateElevatorPosition(targetFloor, true);
-            elevatorAnimation.play();
+            System.out.println("ELEV " + elevatorId + ": Already at floor " + targetFloor);
+            return;
         }
+        Platform.runLater(() -> {
+            stopAllTimers();
+            System.out.println("ELEV " + elevatorId + ": Servicing new request to floor " + targetFloor);
+
+            isMoving = true;
+            setDoorStatus(false);
+            setDirection(targetFloor > currentFloor ? Direction.UP : Direction.DOWN);
+
+
+            waitAtFloor = new PauseTransition(Duration.millis(2000));
+            waitAfterClose = new PauseTransition(Duration.millis(2000));
+
+
+            waitAfterClose.setOnFinished(e -> {
+                isMoving = false;
+                System.out.println("ELEV " + elevatorId + ": Request finished. Now idle.");
+            });
+            waitAtFloor.setOnFinished(e -> {
+                setDoorStatus(false);
+                waitAfterClose.play();
+            });
+            elevatorAnimation.setOnFinished(e -> {
+                setDirection(Direction.IDLE);
+                setDoorStatus(true);
+                waitAtFloor.play();
+            });
+            updateElevatorPosition(targetFloor, true);
+        });
     }
 
     /**
-     * Returns the elevator's current floor.
-     * @return An integer (1-10)
+     * Elevator Current Floor status
      */
     public int getCurrentFloor() {
         return this.currentFloor;
     }
 
     /**
-     * Checks if the elevator is currently moving.
-     * @return true if moving, false if stopped.
+     * Elevator Moving Status
      */
     public boolean isMoving() {
         return this.isMoving;
     }
 
     /**
-     * Checks if the elevator door is currently open.
-     * @return true if the door is open.
+     * Door Open Status
      */
     public boolean isDoorOpen() {
         return this.isDoorOpen;
     }
 
     /**
-     * Returns the elevator current direction.
-     * @return Direction enum
+     * Tells current direction of elevator
      */
     public ElevatorPanel.Direction getCurrentDirection() {
         return this.currentDirection;
     }
 
+    /**
+     * Elevator On/OFf Status
+     */
+    public boolean isEnabled() {
+        return this.isEnabled;
+    }
 }
