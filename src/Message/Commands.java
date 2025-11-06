@@ -20,6 +20,8 @@ package Message;
  *   9 ENABLE       (no arg)
  *  10 DISABLE      (no arg)
  *  11 STATUS       (arg packs a few flags; optional – for logging/diagnostics)
+ *  12 ELEV_START   (no arg) - Individual elevator start
+ *  13 ELEV_STOP    (no arg) - Individual elevator stop
  *
  * STATUS arg packing (optional):
  *   bits  0..7   = floor (0..255)
@@ -40,6 +42,8 @@ public final class Commands {
     public static final int ENABLE     = 9;
     public static final int DISABLE    = 10;
     public static final int STATUS     = 11;
+    public static final int ELEV_START = 12;  // Individual elevator start
+    public static final int ELEV_STOP  = 13;  // Individual elevator stop
 
     // encode/decode helpers
     public static int encode(int opcode, int arg) {

@@ -3,9 +3,7 @@ package Message;
 public class Message {
     private int topic;
     private int subTopic;
-    //private String body;
     private int body;
-
 
     /**
      * Message constructor
