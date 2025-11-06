@@ -12,25 +12,25 @@ import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 import bus.SoftwareBus;
 
+
 /**
- * Starts the whole application with Software Bus integration.
+ * Starts the whole application.
+ * It builds the window and communicates with elevator panels and control buttons.
  */
 public class ElevatorControlSystem extends Application {
 
     private ElevatorAPI api;
     private ElevatorPanel[] elevators = new ElevatorPanel[4];
     private CommandPanel commandPanel;
-    private SoftwareBus busServer;
 
+    /**
+     * sets up and shows the main window when the app starts.
+     */
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Command Center");
-
-        // Create software bus in server mode (command center is the server)
-        this.busServer = new SoftwareBus(true);
-
-        // Create API with bus integration
-        this.api = new ElevatorAPI(busServer);
+        SoftwareBus busServer = new SoftwareBus(true);
+        this.api = new ElevatorAPI();
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #333333;");
@@ -63,11 +63,13 @@ public class ElevatorControlSystem extends Application {
         // Start the background logging thread
         startLoggingThread(api);
 
-        // Start the enhanced test harness
+        // Start the test harness
         startTestHarness(api);
 
-        // Set the initial UI state
+        // Set the initial UI state (buttons, etc.)
         api.setInitialUIState();
+
+        // Elevators will now wait for commands from the test harness.
 
         Scene scene = new Scene(root);
         primaryStage.setScene(scene);
@@ -75,7 +77,8 @@ public class ElevatorControlSystem extends Application {
     }
 
     /**
-     * Enhanced test harness with individual elevator control
+     * Test harness.
+     * Running Commands to test the API.
      */
     public void startTestHarness(ElevatorAPI api) {
         Runnable testTask = () -> {
@@ -83,60 +86,42 @@ public class ElevatorControlSystem extends Application {
                 // Wait for 5 seconds for the app to start
                 Thread.sleep(5000);
 
-                // Test individual elevator control
-                System.out.println("Testing individual elevator control...");
-
-                // Stop elevator 2 individually
-                Platform.runLater(() -> api.sendIndividualStopCommand(2));
-                Thread.sleep(2000);
-
-                // Start elevator 2 individually
-                Platform.runLater(() -> api.sendIndividualStartCommand(2));
-                Thread.sleep(2000);
-
-                // Stop elevator 3 individually
-                Platform.runLater(() -> api.sendIndividualStopCommand(3));
-                Thread.sleep(2000);
-
-                // Normal floor requests
+                // Picking a specific elevator to go to specific floor
                 Platform.runLater(() -> api.sendFloorRequest(1, 10));
                 Thread.sleep(2000);
                 Platform.runLater(() -> api.sendFloorRequest(2, 4));
                 Thread.sleep(2000);
-                Platform.runLater(() -> api.sendFloorRequest(3, 6)); // This should be ignored (elevator 3 is stopped)
+                Platform.runLater(() -> api.sendFloorRequest(3, 6));
                 Thread.sleep(2000);
                 Platform.runLater(() -> api.sendFloorRequest(4, 9));
 
                 Thread.sleep(7000);
 
-                // Start elevator 3 again
-                Platform.runLater(() -> api.sendIndividualStartCommand(3));
-                Thread.sleep(2000);
-
-                // Test fire mode
+                //  TESTFIRE Button Working?
                 Platform.runLater(() -> api.sendFireCommand());
                 Thread.sleep(7000);
 
-                // Clear fire mode
+                // CLEAR FIRE Button Working?
                 Platform.runLater(() -> api.sendClearFireCommand());
                 Thread.sleep(1000);
 
-                // System stop
+                //Stop Button Working?
                 Platform.runLater(() -> api.sendStopCommand());
-                Thread.sleep(2000);
+                Thread.sleep(2000); // Wait 2s
 
-                // System start
+                // START Button Working?
                 Platform.runLater(() -> api.sendStartCommand());
                 Thread.sleep(1000);
 
             } catch (InterruptedException e) {
-                System.out.println("[Test harness interrupted.]");
+                System.out.println("[Test harness interrupted.");
             }
         };
         Thread testThread = new Thread(testTask);
         testThread.setDaemon(true);
         testThread.start();
     }
+
 
     /**
      * Printing Status of Elevators using API.
@@ -152,13 +137,12 @@ public class ElevatorControlSystem extends Application {
 
                     for (int i = 1; i <= 4; i++) {
                         log.append(String.format(
-                                "  [Elev %d] Floor: %-2d | Door: %-6s | Moving: %-5s | Dir: %-4s | Enabled: %-5s\n",
+                                "  [Elev %d] Floor: %-2d | Door: %-6s | Moving: %-5s | Dir: %-4s\n",
                                 i,
                                 api.getElevatorFloor(i),
                                 api.isElevatorDoorOpen(i) ? "OPEN" : "CLOSED",
                                 api.isElevatorMoving(i) ? "Yes" : "No",
-                                api.getElevatorDirection(i),
-                                api.isElevatorEnabled(i) ? "Yes" : "No"
+                                api.getElevatorDirection(i)
                         ));
                     }
 
@@ -175,10 +159,13 @@ public class ElevatorControlSystem extends Application {
         loggingThread.start();
     }
 
+
     /**
      * Launching the application.
      */
     public static void main(String[] args) {
         launch(args);
     }
+
+    private SoftwareBus busServer;
 }

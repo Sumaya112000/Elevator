@@ -212,39 +212,19 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Set enabled state from external commands (bus messages)
+     * Flips the local START/STOP button.
      */
-    public void setEnabledState(boolean enabled) {
-        this.isEnabled = enabled;
+    private void toggleEnabledState() {
+        isEnabled = !isEnabled;
         Platform.runLater(() -> {
-            if (enabled) {
+            if (isEnabled) {
                 mainControlButton.setText(btnText_STOP);
                 mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
             } else {
                 mainControlButton.setText(btnText_START);
                 mainControlButton.setStyle(btnColor_START + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
-
-                // Stop any ongoing movement when disabled
-                stopAllTimers();
-                isMoving = false;
-                setDirection(Direction.IDLE);
             }
         });
-    }
-
-    /**
-     * Modified toggle method to send bus messages
-     */
-    private void toggleEnabledState() {
-        boolean newState = !isEnabled;
-
-        if (newState) {
-            // Starting elevator - send individual start command
-            api.sendIndividualStartCommand(elevatorId);
-        } else {
-            // Stopping elevator - send individual stop command
-            api.sendIndividualStopCommand(elevatorId);
-        }
     }
 
     /**
@@ -261,42 +241,13 @@ public class ElevatorPanel extends VBox {
     }
 
     /**
-     * Update elevator status from messages received via software bus
-     */
-    public void updateStatusFromBus(int floor, boolean doorOpen, boolean moving, Direction direction) {
-        Platform.runLater(() -> {
-            // Stop any ongoing animations
-            stopAllTimers();
-
-            // Update position if floor changed
-            if (floor != this.currentFloor) {
-                updateElevatorPosition(floor, true);
-            } else {
-                updateElevatorPosition(floor, false);
-            }
-
-            // Update door status
-            setDoorStatus(doorOpen);
-
-            // Update movement and direction
-            this.isMoving = moving;
-            setDirection(direction);
-
-            // Update main control button based on movement
-            if (moving) {
-                mainControlButton.setText(btnText_STOP);
-                mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
-            }
-        });
-    }
-
-    /**
      * Moves the elevator car visuals.
      */
     private void updateElevatorPosition(int newFloor, boolean animate) {
         double targetY = (10 - newFloor) * TOTAL_FLOOR_HEIGHT;
         int floorsToTravel = Math.abs(newFloor - this.currentFloor);
         this.currentFloor = newFloor;
+
 
         Platform.runLater(() -> {
             this.currentFloorDisplay.setText(String.valueOf(newFloor));
@@ -349,6 +300,7 @@ public class ElevatorPanel extends VBox {
      * Stops all animations and pauses.
      */
     private void stopAllTimers() {
+
         Platform.runLater(() -> {
             elevatorAnimation.stop();
             if (waitAtFloor != null) waitAtFloor.stop();
@@ -361,6 +313,7 @@ public class ElevatorPanel extends VBox {
      * FIRE mode: forces elevator to floor 1.
      */
     public void forceMoveAndOpen(int targetFloor) {
+
         Platform.runLater(() -> {
             stopAllTimers();
             isMoving = true;
@@ -384,6 +337,7 @@ public class ElevatorPanel extends VBox {
      * CLEAR FIRE mode: closes door and idles.
      */
     public void releaseAndClose() {
+
         Platform.runLater(() -> {
             stopAllTimers();
             setDoorStatus(false);
@@ -395,6 +349,7 @@ public class ElevatorPanel extends VBox {
      * RESET button: forces elevator to floor 1, waits 5s.
      */
     public void forceReset() {
+
         Platform.runLater(() -> {
             stopAllTimers();
 
@@ -420,10 +375,12 @@ public class ElevatorPanel extends VBox {
         });
     }
 
+
     /**
      * Sending Elevator to specific floor.
      */
     public void requestFloor(int targetFloor) {
+
         if (!api.isSystemRunning() || api.getSystemMode().equals("FIRE") || !isEnabled) {
             System.out.println("ELEV " + elevatorId + ": Request to "
                     + targetFloor + " denied (system offline or FIRE).");
@@ -441,8 +398,10 @@ public class ElevatorPanel extends VBox {
             setDoorStatus(false);
             setDirection(targetFloor > currentFloor ? Direction.UP : Direction.DOWN);
 
+
             waitAtFloor = new PauseTransition(Duration.millis(2000));
             waitAfterClose = new PauseTransition(Duration.millis(2000));
+
 
             waitAfterClose.setOnFinished(e -> {
                 isMoving = false;
@@ -461,23 +420,37 @@ public class ElevatorPanel extends VBox {
         });
     }
 
-    // Getters
+    /**
+     * Elevator Current Floor status
+     */
     public int getCurrentFloor() {
         return this.currentFloor;
     }
 
+    /**
+     * Elevator Moving Status
+     */
     public boolean isMoving() {
         return this.isMoving;
     }
 
+    /**
+     * Door Open Status
+     */
     public boolean isDoorOpen() {
         return this.isDoorOpen;
     }
 
-    public Direction getCurrentDirection() {
+    /**
+     * Tells current direction of elevator
+     */
+    public ElevatorPanel.Direction getCurrentDirection() {
         return this.currentDirection;
     }
 
+    /**
+     * Elevator On/OFf Status
+     */
     public boolean isEnabled() {
         return this.isEnabled;
     }
