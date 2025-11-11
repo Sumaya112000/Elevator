@@ -29,17 +29,13 @@ package Message;
  */
 public final class Commands {
     // opcodes
-    public static final int START      = 1;
-    public static final int STOP       = 2;
-    public static final int RESET      = 3;
-    public static final int FIRE_ON    = 4;
-    public static final int FIRE_CLEAR = 5;
-    public static final int GOTO       = 6;
-    public static final int OPEN       = 7;
-    public static final int CLOSE      = 8;
-    public static final int ENABLE     = 9;
-    public static final int DISABLE    = 10;
-    public static final int STATUS     = 11;
+    public static final int STOP = 1;
+    public static final int START = 2;
+    public static final int RESET = 3;
+    public static final int FIRE_CLEAR = 4;
+    public static final int MODE = 5;
+    public static final int START_ELEVATOR = 6;
+    public static final int STOP_ELEVATOR = 7;
 
     // encode/decode helpers
     public static int encode(int opcode, int arg) {
