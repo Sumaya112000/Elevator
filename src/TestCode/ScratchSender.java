@@ -2,70 +2,61 @@ package TestCode;
 
 import bus.SoftwareBus;
 import Message.Message;
-import Message.Topic;
 
 /**
- * ScratchSender: no-UI publisher that talks to the running BUS server.
+ * ScratchSender: scripted BUS test client.
  *
- * Run your Command Center (ElevatorControlSystem) first so the server is up.
- * Then run this main(). It sends a few spaced-out commands that match the
- * spreadsheet protocol (topic, subtopic, body).
- *
- * Bodies for MODE (Topic 5):
- *   1000 = Centralized
- *   1100 = Independent
- *   1110 = Test Fire
- * Elsewhere use 0000.
+ * Run steps:
+ *  1. In IntelliJ, run GUI.ElevatorControlSystem (so the BUS server + GUI are up).
+ *  2. In a second run configuration, run TestCode.ScratchSender.
  */
 public class ScratchSender {
 
-    private static void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
+    private static void send(SoftwareBus bus, int topic, int sub, int body, String label,
+                             long delayMs) throws InterruptedException {
+        System.out.printf(">>> %-50s  (%d-%d-%d)%n", label, topic, sub, body);
+        bus.publish(new Message(topic, sub, body));
+        Thread.sleep(delayMs);
     }
 
-    public static void main(String[] args) {
-        // Connect as a BUS client
+    public static void main(String[] args) throws Exception {
+        System.out.println("ScratchSender: make sure ElevatorControlSystem is already running.");
+        System.out.println("Connecting as BUS client...");
+
+        // Connect as a BUS client (server already running in ElevatorControlSystem)
         SoftwareBus bus = new SoftwareBus(false);
 
-        // 1) START all (topic=2, sub=0, body=0000)
-        bus.publish(new Message(Topic.SYSTEM_START.code(), 0, 0000));
-        System.out.println("Sent: START (20 0000)");
-        sleep(800);
+        // Small wait so subscriptions in ElevatorPanels have time to come up
+        Thread.sleep(1000);
 
-        // 2) MODE -> Centralized (topic=5, sub=0, body=1000)
-        bus.publish(new Message(Topic.MODE.code(), 0, 1000));
-        System.out.println("Sent: MODE CENTRALIZED (50 1000)");
-        sleep(800);
+        // ===== System-wide commands =====
+        send(bus, 2, 0, 0,    "System START (Topic 2, all elevators)", 2000);
+        send(bus, 1, 0, 0,    "System STOP  (Topic 1, all elevators)", 2000);
+        send(bus, 3, 0, 0,    "System RESET (Topic 3, all elevators)", 2500);
 
-        // 3) MODE -> Independent (topic=5, sub=0, body=1100)
-        bus.publish(new Message(Topic.MODE.code(), 0, 1100));
-        System.out.println("Sent: MODE INDEPENDENT (50 1100)");
-        sleep(800);
+        // ===== Mode commands (Topic 5, body flags) =====
+        send(bus, 5, 0, 1000, "Mode = CENTRALIZED (body 1000)",       2000);
+        send(bus, 5, 0, 1100, "Mode = INDEPENDENT (body 1100)",       2000);
 
-        // 4) MODE -> Test Fire (topic=5, sub=0, body=1110)
-        bus.publish(new Message(Topic.MODE.code(), 0, 1110));
-        System.out.println("Sent: MODE TEST FIRE (50 1110)");
-        sleep(1500);
+        // Test fire: cars should recall to floor 1 and open door
+        send(bus, 5, 0, 1110, "Mode = TEST FIRE (body 1110)",         3000);
 
-        // 5) Clear Fire (topic=4, sub=0, body=0000)
-        bus.publish(new Message(Topic.CLEAR_FIRE.code(), 0, 0000));
-        System.out.println("Sent: CLEAR FIRE (40 0000)");
-        sleep(800);
+        // Clear fire: doors should close, fire flag off
+        send(bus, 4, 0, 0,    "CLEAR FIRE (Topic 4)",                 2500);
 
-        // 6) Start only Elevator 3 (topic=6, sub=3, body=0000)
-        bus.publish(new Message(Topic.START_ONE.code(), 3, 0000));
-        System.out.println("Sent: START E3 (63 0000)");
-        sleep(800);
+        // ===== Individual elevator start/stop =====
+        // Start each elevator one by one
+        for (int i = 1; i <= 4; i++) {
+            send(bus, 6, i, 0,
+                    "START elevator " + i + "  (Topic 6, sub=" + i + ")", 1200);
+        }
 
-        // 7) Stop only Elevator 1 (topic=7, sub=1, body=0000)
-        bus.publish(new Message(Topic.STOP_ONE.code(), 1, 0000));
-        System.out.println("Sent: STOP E1 (71 0000)");
-        sleep(800);
+        // Stop each elevator one by one
+        for (int i = 1; i <= 4; i++) {
+            send(bus, 7, i, 0,
+                    "STOP elevator " + i + "   (Topic 7, sub=" + i + ")", 1200);
+        }
 
-        // 8) System STOP all (topic=1, sub=0, body=0000)
-        bus.publish(new Message(Topic.SYSTEM_STOP.code(), 0, 0000));
-        System.out.println("Sent: SYSTEM STOP (10 0000)");
-
-        System.out.println("ScratchSender finished.");
+        System.out.println("ScratchSender: demo sequence finished.");
     }
 }

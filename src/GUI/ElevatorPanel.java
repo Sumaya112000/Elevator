@@ -2,8 +2,6 @@ package GUI;
 
 import bus.SoftwareBus;
 import Message.Message;
-import Message.Commands;
-import Message.Channels;
 
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
@@ -23,15 +21,23 @@ import javafx.geometry.Insets;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ElevatorPanel (reactive BUS client)
- * Listens to: (SYSTEM,0) and (id,0)
+ * ElevatorPanel (reactive BUS client, spreadsheet protocol)
  *
- * - START / STOP: power system on/off
- * - ENABLE / DISABLE: AUTO vs CENTRALIZED (flag only, no self-move)
- * - FIRE_ON / FIRE_CLEAR: recall to floor 1 + lock until cleared
- * - RESET: full reset (door close + floor 1)
- * - GOTO (on per-car topic): move to target floor
- * - OPEN / CLOSE (on per-car topic): door control
+ * Subscriptions per car i (1..4):
+ *   (1,0) System Stop
+ *   (2,0) System Start
+ *   (3,0) System Reset
+ *   (4,0) Clear Fire
+ *   (5,0) Mode (Centralized / Independent / Test Fire)
+ *   (6,i) Start this elevator
+ *   (7,i) Stop this elevator
+ *
+ * Behaviour:
+ *   - System Start/Stop enable or disable the car.
+ *   - Reset moves the car to floor 1 and opens the doors.
+ *   - Mode with body 1110 (Test Fire) recalls the car to floor 1 and opens doors.
+ *   - Clear Fire closes the doors and exits fire mode.
+ *   - Individual Start/Stop (topics 6 & 7) toggle the STOP/START state for that car.
  */
 public class ElevatorPanel extends VBox {
 
@@ -43,14 +49,14 @@ public class ElevatorPanel extends VBox {
     private int currentFloor = 1;
     private Direction currentDirection = Direction.IDLE;
     private boolean isDoorOpen = false;
-    private boolean isEnabled = true;       // true = START active
-    private boolean autoMode = false;       // true = INDEPENDENT (AUTO)
-    private boolean isFireMode = false;     // true = in FIRE recall
+    private boolean isEnabled = true;   // true = running
+    private boolean autoMode = false;   // true = INDEPENDENT (AUTO)
+    private boolean isFireMode = false; // true = in FIRE recall
 
     // BUS
     private final SoftwareBus bus;
 
-    // UI
+    // UI widgets
     private Button mainControlButton;
     private final String btnText_START = "START";
     private final String btnColor_START = "-fx-background-color: #228B22;";
@@ -64,7 +70,8 @@ public class ElevatorPanel extends VBox {
     private Label carFloorLabel;
     private TranslateTransition elevatorAnimation;
 
-    private final ConcurrentHashMap<Integer, DualDotIndicatorPanel> floorCallIndicators = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, DualDotIndicatorPanel> floorCallIndicators =
+            new ConcurrentHashMap<>();
     private final DirectionIndicatorPanel directionIndicator;
     private final Label currentFloorDisplay;
 
@@ -73,7 +80,7 @@ public class ElevatorPanel extends VBox {
     private static final double TOTAL_FLOOR_HEIGHT = FLOOR_HEIGHT + FLOOR_SPACING;
     private static final double ANIMATION_SPEED_PER_FLOOR = 400.0;
 
-    // UI subcomponents
+    // --- UI subcomponents ----------------------------------------------------
 
     private class DualDotIndicatorPanel extends VBox {
         private final Circle upDot = new Circle(3, Color.web("#505050"));
@@ -86,8 +93,8 @@ public class ElevatorPanel extends VBox {
         }
         void setDotLit(Direction direction, boolean lit) {
             Color color = lit ? Color.WHITE : Color.web("#505050");
-            if (direction == Direction.UP) upDot.setFill(color);
-            else if (direction == Direction.DOWN) downDot.setFill(color);
+            if (direction == Direction.UP)   upDot.setFill(color);
+            if (direction == Direction.DOWN) downDot.setFill(color);
         }
     }
 
@@ -96,7 +103,7 @@ public class ElevatorPanel extends VBox {
         private final Color UNLIT_COLOR = Color.BLACK;
         DirectionIndicatorPanel() {
             super(6);
-            upTriangle = new Polygon(6.0, 0.0, 0.0, 8.0, 12.0, 8.0);
+            upTriangle   = new Polygon(6.0, 0.0, 0.0, 8.0, 12.0, 8.0);
             downTriangle = new Polygon(6.0, 8.0, 0.0, 0.0, 12.0, 0.0);
             setDirection(Direction.IDLE);
             getChildren().addAll(upTriangle, downTriangle);
@@ -104,21 +111,28 @@ public class ElevatorPanel extends VBox {
             setPadding(new Insets(5));
         }
         void setDirection(Direction newDirection) {
-            upTriangle.setFill(newDirection == Direction.UP ? Color.WHITE : UNLIT_COLOR);
+            upTriangle.setFill(newDirection == Direction.UP   ? Color.WHITE : UNLIT_COLOR);
             downTriangle.setFill(newDirection == Direction.DOWN ? Color.WHITE : UNLIT_COLOR);
         }
     }
 
-    // Constructor
+    // --- Constructor ---------------------------------------------------------
 
     public ElevatorPanel(int id) {
         super(3);
         this.elevatorId = id;
 
-        // Each panel runs as a BUS client
+        // Each panel is its own BUS client
         this.bus = new SoftwareBus(false);
-        bus.subscribe(Channels.SYSTEM, 0);
-        bus.subscribe(id, 0);
+
+        // Subscribe to all spreadsheet topics relevant for this car
+        bus.subscribe(1, 0);          // System Stop
+        bus.subscribe(2, 0);          // System Start
+        bus.subscribe(3, 0);          // System Reset
+        bus.subscribe(4, 0);          // Clear Fire
+        bus.subscribe(5, 0);          // Mode (Centralized / Independent / Test Fire)
+        bus.subscribe(6, elevatorId); // Start this elevator
+        bus.subscribe(7, elevatorId); // Stop this elevator
 
         // Layout setup
         setAlignment(Pos.CENTER);
@@ -129,8 +143,10 @@ public class ElevatorPanel extends VBox {
         title.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
 
         mainControlButton = new Button(btnText_STOP);
-        mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
+        mainControlButton.setStyle(btnColor_STOP
+                + " -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 0;");
         mainControlButton.setPrefWidth(90);
+        // Local toggle only (visual); real RUN/STOP comes from BUS topics 1,2,6,7
         mainControlButton.setOnAction(e -> toggleEnabledState());
 
         HBox statusRow = new HBox(5);
@@ -138,7 +154,9 @@ public class ElevatorPanel extends VBox {
         statusRow.setPrefWidth(90);
 
         currentFloorDisplay = new Label(String.valueOf(this.currentFloor));
-        currentFloorDisplay.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-font-size: 18px; -fx-font-weight: bold; -fx-alignment: center;");
+        currentFloorDisplay.setStyle(
+                "-fx-background-color: white; -fx-text-fill: black; " +
+                        "-fx-font-size: 18px; -fx-font-weight: bold; -fx-alignment: center;");
         currentFloorDisplay.setPrefSize(30, 30);
 
         directionIndicator = new DirectionIndicatorPanel();
@@ -146,13 +164,15 @@ public class ElevatorPanel extends VBox {
 
         getChildren().addAll(title, mainControlButton, statusRow);
 
-        // Shaft layout
+        // Shaft + car layout
         shaftPane = new StackPane();
         floorButtonColumn = new VBox(FLOOR_SPACING);
         carPane = new Pane();
         carPane.setMouseTransparent(true);
 
-        for (int i = 10; i >= 1; i--) floorButtonColumn.getChildren().add(createFloorRow(i));
+        for (int i = 10; i >= 1; i--) {
+            floorButtonColumn.getChildren().add(createFloorRow(i));
+        }
 
         carFloorLabel = new Label(String.valueOf(this.currentFloor));
         carFloorLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: white; -fx-font-weight: bold;");
@@ -199,75 +219,108 @@ public class ElevatorPanel extends VBox {
     private void applyEnabledUI() {
         if (isEnabled) {
             mainControlButton.setText(btnText_STOP);
-            mainControlButton.setStyle(btnColor_STOP + " -fx-text-fill: white; -fx-font-weight: bold;");
+            mainControlButton.setStyle(btnColor_STOP
+                    + " -fx-text-fill: white; -fx-font-weight: bold;");
         } else {
             mainControlButton.setText(btnText_START);
-            mainControlButton.setStyle(btnColor_START + " -fx-text-fill: white; -fx-font-weight: bold;");
+            mainControlButton.setStyle(btnColor_START
+                    + " -fx-text-fill: white; -fx-font-weight: bold;");
         }
     }
 
-    /* BUS handling*/
+    // --- BUS listener --------------------------------------------------------
+
     private void startBusListener() {
         Thread t = new Thread(() -> {
             while (true) {
-                Message sys = bus.get(Channels.SYSTEM, 0);
-                if (sys != null) handleCommand(sys);
+                poll(1, 0);          // System Stop
+                poll(2, 0);          // System Start
+                poll(3, 0);          // System Reset
+                poll(4, 0);          // Clear Fire
+                poll(5, 0);          // Mode
+                poll(6, elevatorId); // Start this car
+                poll(7, elevatorId); // Stop this car
 
-                Message local = bus.get(elevatorId, 0);
-                if (local != null) handleCommand(local);
-
-                try { Thread.sleep(10); } catch (InterruptedException ignored) {}
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException ignored) {}
             }
         });
         t.setDaemon(true);
         t.start();
     }
 
-    private void handleCommand(Message m) {
-        int topic     = m.getTopic();     // spreadsheet "Topic"
-        int subtopic  = m.getSubTopic();  // 0=all, 1..4 = specific elevator
-        int body      = m.getBody();      // e.g., 0000, 1000, 1100, 1110
+    private void poll(int topic, int subtopic) {
+        Message m = bus.get(topic, subtopic);
+        if (m != null) handleCommand(m);
+    }
 
-        // If this is a per-car message (topics 6 or 7), ignore if not for me
-        if ((topic == 6 || topic == 7) && subtopic != this.elevatorId) return;
+    private void handleCommand(Message m) {
+        int topic    = m.getTopic();
+        int subtopic = m.getSubTopic();
+        int body     = m.getBody();   // e.g. 0, 1000, 1100, 1110
 
         switch (topic) {
-            case 1 -> { // System Stop (all)
-                Platform.runLater(() -> { isEnabled = false; applyEnabledUI(); });
+            case 1 -> // System Stop (all)
+                    Platform.runLater(() -> {
+                        isEnabled = false;
+                        applyEnabledUI();
+                    });
+
+            case 2 -> // System Start (all)
+                    Platform.runLater(() -> {
+                        isEnabled = true;
+                        applyEnabledUI();
+                    });
+
+            case 3 -> // System Reset (all)
+                    Platform.runLater(this::resetToOne);
+
+            case 4 -> // Clear Fire (all)
+                    Platform.runLater(() -> {
+                        isFireMode = false;
+                        closeDoor();
+                    });
+
+            case 5 -> // Mode (body 1000 / 1100 / 1110)
+                    Platform.runLater(() -> {
+                        if (body == 1000) {          // Centralized
+                            autoMode = false;
+                            isFireMode = false;
+                        } else if (body == 1100) {   // Independent
+                            autoMode = true;
+                            isFireMode = false;
+                        } else if (body == 1110) {   // Test Fire
+                            isFireMode = true;
+                            recallToLobby();
+                        }
+                    });
+
+            case 6 -> { // Start this elevator (subtopic == elevatorId)
+                if (subtopic == elevatorId) {
+                    Platform.runLater(() -> {
+                        isEnabled = true;
+                        applyEnabledUI();
+                    });
+                }
             }
-            case 2 -> { // System Start (all)
-                Platform.runLater(() -> { isEnabled = true; applyEnabledUI(); });
+
+            case 7 -> { // Stop this elevator (subtopic == elevatorId)
+                if (subtopic == elevatorId) {
+                    Platform.runLater(() -> {
+                        isEnabled = false;
+                        applyEnabledUI();
+                    });
+                }
             }
-            case 3 -> { // System Reset (all)
-                Platform.runLater(this::resetToOne);
+
+            default -> {
+                // ignore unknown topics
             }
-            case 4 -> { // Clear Fire (all)
-                Platform.runLater(() -> { isFireMode = false; closeDoor(); });
-            }
-            case 5 -> { // Mode (all) — body flags: 1000=CEN, 1100=IND, 1110=TEST FIRE
-                Platform.runLater(() -> {
-                    if (body == 1000) {              // Centralized
-                        autoMode = false;
-                        // (visuals updated by CommandPanel itself; car just updates its flags)
-                    } else if (body == 1100) {       // Independent (Auto)
-                        autoMode = true;
-                    } else if (body == 1110) {       // Test Fire
-                        isFireMode = true;
-                        recallToLobby();
-                    }
-                });
-            }
-            case 6 -> { // Start an individual elevator (subtopic = 1..4)
-                Platform.runLater(() -> { isEnabled = true; applyEnabledUI(); });
-            }
-            case 7 -> { // Stop an individual elevator (subtopic = 1..4)
-                Platform.runLater(() -> { isEnabled = false; applyEnabledUI(); });
-            }
-            default -> { /* ignore unknown topics */ }
         }
     }
 
-    /* Movement and door helpers */
+    // --- Movement & door helpers --------------------------------------------
 
     private void updateElevatorPosition(int newFloor, boolean animate) {
         double targetY = (10 - newFloor) * TOTAL_FLOOR_HEIGHT;
@@ -279,7 +332,8 @@ public class ElevatorPanel extends VBox {
 
         if (animate) {
             elevatorAnimation.stop();
-            elevatorAnimation.setDuration(Duration.millis(Math.max(1, floorsToTravel) * ANIMATION_SPEED_PER_FLOOR));
+            elevatorAnimation.setDuration(
+                    Duration.millis(Math.max(1, floorsToTravel) * ANIMATION_SPEED_PER_FLOOR));
             elevatorAnimation.setToY(targetY);
             elevatorAnimation.play();
         } else {
@@ -290,7 +344,8 @@ public class ElevatorPanel extends VBox {
     private void setDoorStatus(boolean open) {
         this.isDoorOpen = open;
         String borderColor = open ? "white" : "black";
-        movingCar.setStyle("-fx-background-color: #606060;-fx-border-color: " + borderColor + ";-fx-border-width: 0 2 0 2;");
+        movingCar.setStyle("-fx-background-color: #606060;-fx-border-color: "
+                + borderColor + ";-fx-border-width: 0 2 0 2;");
     }
 
     private void setDirection(Direction d) {
@@ -298,6 +353,7 @@ public class ElevatorPanel extends VBox {
         directionIndicator.setDirection(d);
     }
 
+    /** Generic move helper, used by reset and fire recall. */
     private void moveTo(int targetFloor) {
         if (!isEnabled || isFireMode) return;
         setDoorStatus(false);
@@ -310,6 +366,7 @@ public class ElevatorPanel extends VBox {
         });
     }
 
+    /** Fire recall (or forced recall) to lobby floor 1. */
     private void recallToLobby() {
         if (currentFloor == 1) {
             setDoorStatus(true);
@@ -326,13 +383,17 @@ public class ElevatorPanel extends VBox {
 
     private void resetToOne() {
         setDoorStatus(false);
-        moveTo(1);
-        elevatorAnimation.setOnFinished(e -> setDoorStatus(true));
+        setDirection(currentFloor > 1 ? Direction.DOWN : Direction.IDLE);
+        updateElevatorPosition(1, true);
+        elevatorAnimation.setOnFinished(e -> {
+            setDirection(Direction.IDLE);
+            setDoorStatus(true);
+        });
     }
 
     private void closeDoor() { setDoorStatus(false); }
 
-    /* Getters (optional)*/
+    // --- Getters (optional, for diagnostics) --------------------------------
     public int getCurrentFloor() { return currentFloor; }
     public boolean isDoorOpen() { return isDoorOpen; }
     public boolean isAutoMode() { return autoMode; }

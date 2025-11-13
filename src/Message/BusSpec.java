@@ -1,7 +1,6 @@
 package Message;
 
 /**
- * Spreadsheet-aligned BUS constants.
  * We keep your Message triplet: (topic:int, subTopic:int, body:int).
  *
  * Topics (ints):
