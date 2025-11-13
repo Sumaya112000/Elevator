@@ -12,16 +12,10 @@ import javafx.geometry.Insets;
 
 import bus.SoftwareBus;
 
-/**
- * Hosts the Command Center window and starts the BUS server.
- * - Starts one SoftwareBus(true) server.
- * - Creates one client for the CommandPanel to publish system-wide commands.
- * - Each ElevatorPanel creates its own client and subscribes to topics.
- */
 public class ElevatorControlSystem extends Application {
 
-    private SoftwareBus busServer;   // server socket
-    private SoftwareBus ccClient;    // command panel's publisher client
+    private SoftwareBus busServer;
+    private SoftwareBus ccClient;
     private ElevatorPanel[] elevators;
     private CommandPanel commandPanel;
 
@@ -29,34 +23,28 @@ public class ElevatorControlSystem extends Application {
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Command Center");
 
-        // Start BUS server
         busServer = new SoftwareBus(true);
-
-        // Client for the right-side command panel
         ccClient = new SoftwareBus(false);
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #333333;");
 
-        Label titleLabel = new Label("Command Center");
-        titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
-        StackPane titlePane = new StackPane(titleLabel);
-        titlePane.setPadding(new Insets(10));
-        root.setTop(titleLabel);
+        Label title = new Label("Command Center");
+        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
+        root.setTop(title);
+        BorderPane.setMargin(title, new Insets(10));
 
-        // Center: 4 elevators
         HBox elevatorContainer = new HBox(15);
         elevatorContainer.setAlignment(Pos.TOP_CENTER);
         elevatorContainer.setPadding(new Insets(10));
 
         elevators = new ElevatorPanel[4];
         for (int i = 0; i < 4; i++) {
-            elevators[i] = new ElevatorPanel(i + 1); // each panel makes its own client + subscriptions
+            elevators[i] = new ElevatorPanel(i + 1);
             elevatorContainer.getChildren().add(elevators[i]);
         }
-        root.setCenter(new StackPane(elevatorContainer));
+        root.setCenter(elevatorContainer);
 
-        // Right: command stack (publishes over bus)
         commandPanel = new CommandPanel(ccClient);
         root.setRight(commandPanel);
 

@@ -1,8 +1,7 @@
 package Message;
 
 /**
- * We keep your Message triplet: (topic:int, subTopic:int, body:int).
- *
+ * Message triplet: (topic:int, subTopic:int, body:int).
  * Topics (ints):
  *   1 = System Stop        (all)
  *   2 = System Start       (all)
@@ -34,7 +33,7 @@ public final class BusSpec {
     public static final int B_MODE_IND = 1100;
     public static final int B_MODE_TF  = 1110;
 
-    /** Pretty printer for logs: TSBBBB (T=topic, S=subtopic, BBBB=body) */
+    /** printer for logs: TSBBBB (T=topic, S=subtopic, BBBB=body) */
     public static String tsbbbb(int topic, int subTopic, int body4) {
         return String.format("%d%d%04d", topic, subTopic, body4);
     }

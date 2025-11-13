@@ -20,7 +20,7 @@ public enum Topic {
     Topic(int code) { this.code = code; }
     public int code() { return code; }
 
-    /** Reverse lookup if you ever need it. Returns null if unknown. */
+    // Reverse lookup
     public static Topic fromCode(int code) {
         for (Topic t : values()) if (t.code == code) return t;
         return null;

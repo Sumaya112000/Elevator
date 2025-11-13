@@ -14,9 +14,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.VPos;
 
 /**
- * CommandPanel (BUS-driven, spreadsheet protocol)
- *
- * Uses the BUS command spec:
+ * CommandPanel
+ * Uses the BUS commands:
  *
  *  Topic  Subtopic   Body(4 ints)  Meaning
  *    1       0       {0,0,0,0}    System Stop        (all elevators)
@@ -30,12 +29,9 @@ import javafx.geometry.VPos;
  *    7     1..4      {0,0,0,0}    Stop individual elevator
  *
  * Here we encode Body(4 ints) as a simple 4-digit int:
- *   {1,0,0,0} → 1000
- *   {1,1,0,0} → 1100
- *   {1,1,1,0} → 1110
- *
- * All messages are sent over SoftwareBus using:
- *   new Message(topic, subtopic, bodyInt)
+ *   {1,0,0,0} to 1000
+ *   {1,1,0,0} to 1100 and
+ *   {1,1,1,0} to 1110
  */
 public class CommandPanel extends GridPane {
 
@@ -49,85 +45,110 @@ public class CommandPanel extends GridPane {
     private final Button stopButton;
     private final Button resetButton;
 
+
     // Local UI state (purely visual)
     private boolean systemRunning = true;
     private String systemMode = "CENTRALIZED"; // CENTRALIZED | INDEPENDENT | FIRE
 
+
     // Styling
     private final String modeDisplayBaseStyle =
-            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; " +
-                    "-fx-alignment: center; -fx-background-radius: 10;";
+            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px; " +
+                    "-fx-alignment: center; -fx-background-radius: 14; -fx-padding: 6 10 6 10;";
+
+
     private final String buttonBaseStyle =
-            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; " +
-                    "-fx-background-radius: 0;";
-    private final String autoBtnStyle_ON  =
-            "-fx-background-color: #00008B; -fx-border-color: #B8860B; -fx-border-width: 3; "
-                    + buttonBaseStyle;
-    private final String autoBtnStyle_OFF =
-            "-fx-background-color: #00008B; -fx-border-color: transparent; -fx-border-width: 3; "
-                    + buttonBaseStyle;
-    private final String fireBtnColor_ON  = "-fx-background-color: #FF8C00;";
-    private final String fireBtnColor_OFF = "-fx-background-color: #B22222;";
-    private final String modeColor_CEN    = "-fx-background-color: #006400;";
-    private final String modeColor_IND    = "-fx-background-color: #505050;";
-    private final String modeColor_FIRE   = "-fx-background-color: red;";
+            "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px; " +
+                    "-fx-background-radius: 14; -fx-padding: 6 10 6 10; " +
+                    "-fx-border-radius: 14; -fx-border-width: 1; -fx-border-color: rgba(255,255,255,0.15);";
+
+
+
+
+    private final String colorModeCentral = "-fx-background-color: #00695C;";
+    private final String colorModeIndependent = "-fx-background-color: #424242;";
+    private final String colorModeFire = "-fx-background-color: #D32F2F;";
+    private final String colorFire = "-fx-background-color: #C62828;";
+    private final String colorAuto = "-fx-background-color: #283593;";
+    private final String colorStart = "-fx-background-color: #2E7D32;";
+    private final String colorStop = "-fx-background-color: #B71C1C;";
+    private final String colorReset = "-fx-background-color: #212121;";
+    private final String autoBorderOn  = "-fx-border-color: #FFEB3B;";
+    private final String autoBorderOff = "-fx-border-color: rgba(255,255,255,0.10);";
+    private final String fireBtnGlowOn  = "-fx-effect: dropshadow(gaussian, rgba(255,193,7,0.7), 18, 0.4, 0, 0);";
+    private final String fireBtnGlowOff = "-fx-effect: none;";
+
+
 
     public CommandPanel(SoftwareBus bus) {
         this.bus = bus;
 
         // Layout grid
         setStyle("-fx-background-color: #333333;");
-        setPadding(new Insets(10, 20, 10, 20));
+        setPadding(new Insets(20, 24, 20, 24));
         setHgap(10);
-        setVgap(3);
+        setVgap(10);
 
-        RowConstraints row0 = rc(20);
+        RowConstraints row0 = rc(10);
         RowConstraints row1 = rc(30);
         RowConstraints row2 = rc(30);
         RowConstraints row3 = rc(32);
         getRowConstraints().addAll(row0, row1, row2, row3);
-        RowConstraints floorRow = rc(30);
+        RowConstraints buttonRow = rc(70);
         for (int i = 0; i < 10; i++) {
-            getRowConstraints().add(floorRow);
+            getRowConstraints().add(buttonRow);
         }
 
         // Mode display badge
         modeDisplay = new Label("CENTRALIZED");
-        modeDisplay.setPrefSize(150, 65);
-        modeDisplay.setStyle(modeDisplayBaseStyle + modeColor_CEN);
+        modeDisplay.setPrefSize(170, 60);
+        modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
         add(modeDisplay, 0, 2, 1, 2);
 
-        // Buttons → publish spreadsheet-style messages
-        fireControlButton = createButton("TEST FIRE", Color.web("#B22222"), 63,
+
+
+        // Buttons  publish messages
+        fireControlButton = createButton("TEST FIRE", Color.web("#C62828"), 70,
                 e -> onFirePressed());
         add(fireControlButton, 0, 4, 1, 2);
 
-        autoButton = createButton("AUTO", Color.web("#00008B"), 63,
+
+
+        autoButton = createButton("AUTO", Color.web("#283593"), 70,
                 e -> onAutoPressed());
-        autoButton.setStyle(autoBtnStyle_ON);
+        autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOn);
         add(autoButton, 0, 6, 1, 2);
 
-        startButton = createButton("START", Color.web("#228B22"), 63,
+
+
+        startButton = createButton("START", Color.web("#2E7D32"), 70,
                 e -> onStart());
         add(startButton, 0, 8, 1, 2);
 
-        stopButton = createButton("STOP", Color.web("#B22222"), 63,
+
+
+        stopButton = createButton("STOP", Color.web("#B71C1C"), 70,
                 e -> onStop());
         add(stopButton, 0, 10, 1, 2);
 
-        resetButton = createButton("RESET", Color.BLACK, 63,
+
+
+        resetButton = createButton("RESET", Color.web("#212121"), 70,
                 e -> onReset());
         add(resetButton, 0, 12, 1, 2);
+
+
 
         updateButtonStates(true);
     }
 
-    /* ---------- BUS PUBLISH HELPERS ---------- */
+    //bus publisher helpers
 
     /** Broadcast a message to all elevators (subtopic = 0). */
     private void publishAll(int topic, int body) {
         bus.publish(new Message(topic, 0, body));
     }
+
 
     /** Send a message to one elevator (subtopic = elevatorId 1..4). */
     public void publishToCar(int topic, int elevatorId, int body) {
@@ -135,79 +156,75 @@ public class CommandPanel extends GridPane {
         bus.publish(new Message(topic, elevatorId, body));
     }
 
-    /* ---------- BUTTON HANDLERS ---------- */
 
+    //button handlers
     private void onStart() {
         systemRunning = true;
-        // Topic 2, Subtopic 0, Body 0000 → System Start (all elevators)
-        publishAll(2, 0);
+        publishAll(2, 0); // System Start
         updateButtonStates(true);
     }
 
+
     private void onStop() {
         systemRunning = false;
-        // Topic 1, Subtopic 0, Body 0000 → System Stop (all elevators)
-        publishAll(1, 0);
+        publishAll(1, 0); // System Stop
         updateButtonStates(false);
     }
+
 
     private void onReset() {
         systemRunning = true;
         systemMode = "CENTRALIZED";
-        // Topic 3, Subtopic 0, Body 0000 → System Reset (all elevators)
-        publishAll(3, 0);
+        publishAll(3, 0); // System Reset
         updateForReset();
     }
 
+
     private void onFirePressed() {
         if ("FIRE".equals(systemMode)) {
-            // Clear fire
             systemMode = "CENTRALIZED";
-            // Topic 4, Body 0000 → Clear Fire (all elevators)
-            publishAll(4, 0);
+            publishAll(4, 0);    // Clear Fire
             updateForFireMode(false);
         } else {
-            // Enter Fire mode
             systemMode = "FIRE";
-            // Topic 5, Body 1110 → Mode: Test Fire (all elevators)
-            publishAll(5, 1110);
+            publishAll(5, 1110); // Test Fire
             updateForFireMode(true);
         }
     }
+
 
     private void onAutoPressed() {
         if ("FIRE".equals(systemMode)) return; // ignore during FIRE
 
         if ("CENTRALIZED".equals(systemMode)) {
-            // Switch to INDEPENDENT
             systemMode = "INDEPENDENT";
-            // Topic 5, Body 1100 → Mode: Independent
-            publishAll(5, 1100);
+            publishAll(5, 1100); // Mode: Independent
             updateForAutoMode("INDEPENDENT");
         } else {
-            // Back to CENTRALIZED
             systemMode = "CENTRALIZED";
-            // Topic 5, Body 1000 → Mode: Centralized
-            publishAll(5, 1000);
+            publishAll(5, 1000); // Mode: Centralized
             updateForAutoMode("CENTRALIZED");
         }
     }
 
-    /* ---------- LOCAL UI HELPERS (purely visual) ---------- */
+    //LOCAL ui HELPERS
 
     private Button createButton(String text, Color bgColor, double height,
                                 EventHandler<ActionEvent> listener) {
         Button button = new Button(text);
-        String hex = String.format("#%02X%02X%02X",
-                (int) (bgColor.getRed() * 255),
-                (int) (bgColor.getGreen() * 255),
-                (int) (bgColor.getBlue() * 255));
-        button.setStyle("-fx-background-color: " + hex + ";" + buttonBaseStyle);
-        button.setPrefSize(150, height);
+        button.setStyle(buttonBaseStyle +
+                String.format(" -fx-background-color: #%02X%02X%02X;",
+                        (int) (bgColor.getRed() * 255),
+                        (int) (bgColor.getGreen() * 255),
+                        (int) (bgColor.getBlue() * 255)));
+        button.setPrefSize(170, height);
         button.setMaxHeight(height);
+        // keep text visible even when disabled
+        button.setStyle(button.getStyle() + " -fx-opacity: 1.0;");
         if (listener != null) button.setOnAction(listener);
         return button;
     }
+
 
     private RowConstraints rc(double h) {
         RowConstraints rc = new RowConstraints(h);
@@ -215,53 +232,62 @@ public class CommandPanel extends GridPane {
         return rc;
     }
 
+
     public void updateButtonStates(boolean isRunning) {
         startButton.setDisable(isRunning);
         stopButton.setDisable(!isRunning);
         fireControlButton.setDisable(!isRunning);
         autoButton.setDisable(!isRunning);
         resetButton.setDisable(!isRunning);
+
+        // keep labels readable even when disabled
+        String keepOpacity = " -fx-opacity: 1.0;";
+        startButton.setStyle(startButton.getStyle() + keepOpacity);
+        stopButton.setStyle(stopButton.getStyle() + keepOpacity);
+        fireControlButton.setStyle(fireControlButton.getStyle() + keepOpacity);
+        autoButton.setStyle(autoButton.getStyle() + keepOpacity);
+        resetButton.setStyle(resetButton.getStyle() + keepOpacity);
     }
+
 
     public void updateForReset() {
         modeDisplay.setText("CENTRALIZED");
-        modeDisplay.setStyle(modeDisplayBaseStyle + modeColor_CEN);
+        modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
         fireControlButton.setText("TEST FIRE");
-        fireControlButton.setStyle(
-                fireControlButton.getStyle()
-                        .replaceFirst("-fx-background-color: #.*?;", fireBtnColor_OFF));
-        autoButton.setStyle(autoBtnStyle_ON);
+        fireControlButton.setStyle(colorFire + " " + buttonBaseStyle + " " + fireBtnGlowOff);
+        autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOn + " -fx-opacity: 1.0;");
         updateButtonStates(true);
     }
+
 
     public void updateForFireMode(boolean isFire) {
         if (isFire) {
             modeDisplay.setText("FIRE");
-            modeDisplay.setStyle(modeDisplayBaseStyle + modeColor_FIRE);
+            modeDisplay.setStyle(modeDisplayBaseStyle + colorModeFire);
             fireControlButton.setText("CLEAR FIRE");
-            fireControlButton.setStyle(
-                    fireControlButton.getStyle()
-                            .replaceFirst("-fx-background-color: #.*?;", fireBtnColor_ON));
+            fireControlButton.setStyle(colorFire + " " + buttonBaseStyle + " " + fireBtnGlowOn + " -fx-opacity: 1.0;");
         } else {
             modeDisplay.setText("CENTRALIZED");
-            modeDisplay.setStyle(modeDisplayBaseStyle + modeColor_CEN);
+            modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
             fireControlButton.setText("TEST FIRE");
-            fireControlButton.setStyle(
-                    fireControlButton.getStyle()
-                            .replaceFirst("-fx-background-color: #.*?;", fireBtnColor_OFF));
-            autoButton.setStyle(autoBtnStyle_ON);
+            fireControlButton.setStyle(colorFire + " " + buttonBaseStyle + " " + fireBtnGlowOff + " -fx-opacity: 1.0;");
+            autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOn + " -fx-opacity: 1.0;");
         }
     }
+
 
     public void updateForAutoMode(String mode) {
         if ("CENTRALIZED".equals(mode)) {
             modeDisplay.setText("CENTRALIZED");
-            modeDisplay.setStyle(modeDisplayBaseStyle + modeColor_CEN);
-            autoButton.setStyle(autoBtnStyle_ON);
+            modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
+            autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOn + " -fx-opacity: 1.0;");
         } else {
             modeDisplay.setText("INDEPENDENT");
-            modeDisplay.setStyle(modeDisplayBaseStyle + modeColor_IND);
-            autoButton.setStyle(autoBtnStyle_OFF);
+            modeDisplay.setStyle(modeDisplayBaseStyle + colorModeIndependent);
+            autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOff + " -fx-opacity: 1.0;");
         }
+
     }
+
+
 }
