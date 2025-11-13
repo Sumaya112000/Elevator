@@ -103,17 +103,15 @@ public class CommandPanel extends GridPane {
 
     /* ---------- PUBLISH HELPERS ---------- */
 
-    /** Broadcasts an opcode with arg to all cars (topic = SYSTEM, subtopic = 0). */
-    private void publishAll(int opcode, int arg) {
-        int body = Commands.encode(opcode, arg);
-        bus.publish(new Message(Channels.SYSTEM, 0, body));
+    /** Broadcast a spreadsheet-style message to all cars. */
+    private void publishAll(int topic, int body) {
+        bus.publish(new Message(topic, 0, body));
     }
 
-    /** Sends an opcode+arg to a specific car (topic = elevatorId 1..4, subtopic = 0). */
-    public void publishToCar(int elevatorId, int opcode, int arg) {
-        if (elevatorId < 1 || elevatorId > 4) return; // guard
-        int body = Commands.encode(opcode, arg);
-        bus.publish(new Message(elevatorId, 0, body));
+    /** Send a spreadsheet-style message to one car (subtopic = elevatorId). */
+    public void publishToCar(int topic, int elevatorId, int body) {
+        if (elevatorId < 1 || elevatorId > 4) return;
+        bus.publish(new Message(topic, elevatorId, body));
     }
 
     /** Convenience: tell one car to go to a floor (clamped 1..10). */
@@ -129,45 +127,44 @@ public class CommandPanel extends GridPane {
 
     private void onStart() {
         systemRunning = true;
-        sendToAll(Commands.START);
+        publishAll(2, 0);       // Topic 2 = System Start, body 0000
         updateButtonStates(true);
     }
 
     private void onStop() {
         systemRunning = false;
-        sendToAll(Commands.STOP);
+        publishAll(1, 0);       // Topic 1 = System Stop
         updateButtonStates(false);
     }
 
     private void onReset() {
         systemRunning = true;
         systemMode = "CENTRALIZED";
-        sendToAll(Commands.RESET);
+        publishAll(3, 0);       // Topic 3 = System Reset
         updateForReset();
     }
 
     private void onFirePressed() {
         if ("FIRE".equals(systemMode)) {
             systemMode = "CENTRALIZED";
-            sendToAll(Commands.FIRE_CLEAR);
+            publishAll(4, 0);   // Topic 4 = Clear Fire
             updateForFireMode(false);
         } else {
             systemMode = "FIRE";
-            sendToAll(Commands.FIRE_ON);
+            publishAll(5, 1110); // Topic 5, body 1110 = Test Fire
             updateForFireMode(true);
         }
     }
 
     private void onAutoPressed() {
-        if ("FIRE".equals(systemMode)) return; // locked during fire
+        if ("FIRE".equals(systemMode)) return;
         if ("CENTRALIZED".equals(systemMode)) {
             systemMode = "INDEPENDENT";
-            // Semantics: broadcast DISABLE as a hint to leave centralized dispatch
-            sendToAll(Commands.DISABLE);
+            publishAll(5, 1100); // Independent
             updateForAutoMode("INDEPENDENT");
         } else {
             systemMode = "CENTRALIZED";
-            sendToAll(Commands.ENABLE);
+            publishAll(5, 1000); // Centralized
             updateForAutoMode("CENTRALIZED");
         }
     }

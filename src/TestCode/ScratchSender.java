@@ -2,45 +2,69 @@ package TestCode;
 
 import bus.SoftwareBus;
 import Message.Message;
-import Message.Commands;
-import Message.Channels;
+import Message.Topic;
 
 /**
- * ScratchSender: a tiny no-UI publisher that connects to the running BUS server
- * and sends a few demo commands. Run your Command Center (ElevatorControlSystem)
- * first so the BUS server is up, then run this main().
+ * ScratchSender: no-UI publisher that talks to the running BUS server.
+ *
+ * Run your Command Center (ElevatorControlSystem) first so the server is up.
+ * Then run this main(). It sends a few spaced-out commands that match the
+ * spreadsheet protocol (topic, subtopic, body).
+ *
+ * Bodies for MODE (Topic 5):
+ *   1000 = Centralized
+ *   1100 = Independent
+ *   1110 = Test Fire
+ * Elsewhere use 0000.
  */
 public class ScratchSender {
-    public static void main(String[] args) throws Exception {
-        // Connect as a BUS client (server must already be running)
+
+    private static void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
+    }
+
+    public static void main(String[] args) {
+        // Connect as a BUS client
         SoftwareBus bus = new SoftwareBus(false);
 
-        // --- Examples ---
+        // 1) START all (topic=2, sub=0, body=0000)
+        bus.publish(new Message(Topic.SYSTEM_START.code(), 0, 0000));
+        System.out.println("Sent: START (20 0000)");
+        sleep(800);
 
-        // 1) START all elevators (system-wide topic 0)
-        bus.publish(new Message(Channels.SYSTEM, 0, Commands.encode(Commands.START, 0)));
-        System.out.println("Sent: START (broadcast)");
+        // 2) MODE -> Centralized (topic=5, sub=0, body=1000)
+        bus.publish(new Message(Topic.MODE.code(), 0, 1000));
+        System.out.println("Sent: MODE CENTRALIZED (50 1000)");
+        sleep(800);
 
-        // 2) Targeted move: Elevator 3 → floor 7 (topic = 3)
-        bus.publish(new Message(3, 0, Commands.encode(Commands.GOTO, 7)));
-        System.out.println("Sent: E3 GOTO 7");
-        Thread.sleep(2200);
+        // 3) MODE -> Independent (topic=5, sub=0, body=1100)
+        bus.publish(new Message(Topic.MODE.code(), 0, 1100));
+        System.out.println("Sent: MODE INDEPENDENT (50 1100)");
+        sleep(800);
 
-        // 3) FIRE ON (everyone recalls to 1 and opens)
-        bus.publish(new Message(Channels.SYSTEM, 0, Commands.encode(Commands.FIRE_ON, 0)));
-        System.out.println("Sent: FIRE_ON");
-        Thread.sleep(2500);
+        // 4) MODE -> Test Fire (topic=5, sub=0, body=1110)
+        bus.publish(new Message(Topic.MODE.code(), 0, 1110));
+        System.out.println("Sent: MODE TEST FIRE (50 1110)");
+        sleep(1500);
 
-        // 4) Clear FIRE
-        bus.publish(new Message(Channels.SYSTEM, 0, Commands.encode(Commands.FIRE_CLEAR, 0)));
-        System.out.println("Sent: FIRE_CLEAR");
-        Thread.sleep(2000);
+        // 5) Clear Fire (topic=4, sub=0, body=0000)
+        bus.publish(new Message(Topic.CLEAR_FIRE.code(), 0, 0000));
+        System.out.println("Sent: CLEAR FIRE (40 0000)");
+        sleep(800);
 
-        // 5) Move ALL elevators to floor 5 (separate messages to topics 1–4)
-        for (int i = 1; i <= 4; i++) {
-            bus.publish(new Message(i, 0, Commands.encode(Commands.GOTO, 5)));
-            System.out.println("Sent: Elevator " + i + " GOTO 5");
-            Thread.sleep(500);
+        // 6) Start only Elevator 3 (topic=6, sub=3, body=0000)
+        bus.publish(new Message(Topic.START_ONE.code(), 3, 0000));
+        System.out.println("Sent: START E3 (63 0000)");
+        sleep(800);
+
+        // 7) Stop only Elevator 1 (topic=7, sub=1, body=0000)
+        bus.publish(new Message(Topic.STOP_ONE.code(), 1, 0000));
+        System.out.println("Sent: STOP E1 (71 0000)");
+        sleep(800);
+
+        // 8) System STOP all (topic=1, sub=0, body=0000)
+        bus.publish(new Message(Topic.SYSTEM_STOP.code(), 0, 0000));
+        System.out.println("Sent: SYSTEM STOP (10 0000)");
 
         System.out.println("ScratchSender finished.");
     }
