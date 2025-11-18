@@ -1,4 +1,4 @@
-package Message;
+package CommandCenter.Messages;
 
 public class Message {
     private int topic;

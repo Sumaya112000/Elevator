@@ -1,4 +1,4 @@
-package Message;
+package CommandCenter.Messages;
 
 /**
  * Message triplet: (topic:int, subTopic:int, body:int).

@@ -1,4 +1,4 @@
-package Message;
+package CommandCenter.Messages;
 
 /** Bus channels (topic numbers):
  *  0 = system-wide broadcast (all elevators listen)

@@ -1,42 +1,30 @@
-package GUI;
+package CommandCenter.GUI;
 
+import CommandCenter.Messages.Message;
 import bus.SoftwareBus;
-import Message.Message;
-
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Polygon;
-import javafx.scene.paint.Color;
 import javafx.util.Duration;
-import javafx.geometry.Pos;
-import javafx.geometry.Insets;
 
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * ElevatorPanel
- * Topics per car i (1..4):
- *   (1,0) System Stop
- *   (2,0) System Start
- *   (3,0) System Reset
- *   (4,0) Clear Fire
- *   (5,0) Mode (Centralized / Independent / Test Fire)
- *   (6,i) Start this elevator
- *   (7,i) Stop this elevator
- *   (9,i) Move this elevator to floor = body (TEMP for demo)
  */
 public class ElevatorPanel extends VBox {
 
     public enum Direction { UP, DOWN, IDLE }
-    private final int elevatorId;
-
 
     // state flags
     // Start visually at floor 10 (top) for testing demo
@@ -48,13 +36,9 @@ public class ElevatorPanel extends VBox {
     private boolean isFireMode = false;   // true = in FIRE recall
 
 
-    // For pause/resume
-    private Integer pendingTargetFloor = null;
-    private boolean isMoving = false;
-
-
     // BUS client
     private final SoftwareBus bus;
+    private final int elevatorId;
 
 
 
@@ -79,8 +63,7 @@ public class ElevatorPanel extends VBox {
     private static final double FLOOR_HEIGHT = 30.0;
     private static final double FLOOR_SPACING = 3.0;
     private static final double TOTAL_FLOOR_HEIGHT = FLOOR_HEIGHT + FLOOR_SPACING;
-    private static final double ANIMATION_SPEED_PER_FLOOR = 400.0; // ms per floor
-
+    private static final double ANIMATION_SPEED_PER_FLOOR = 800.0; // ms per floor
 
 
     // ui components
@@ -139,9 +122,13 @@ public class ElevatorPanel extends VBox {
         bus.subscribe(3, 0);          // System Reset
         bus.subscribe(4, 0);          // Clear Fire
         bus.subscribe(5, 0);          // Mode (Centralized / Independent / Test Fire)
-        bus.subscribe(6, elevatorId); // Start this elevator
-        bus.subscribe(7, elevatorId); // Stop this elevator
-        bus.subscribe(9, elevatorId); // TEMP movement topic
+        bus.subscribe(6, elevatorId);         // Start this elevator
+        bus.subscribe(7, elevatorId);         // Stop this elevator
+        bus.subscribe(102, elevatorId);       // DISPATCH
+        bus.subscribe(202, elevatorId);       // POSITION
+        bus.subscribe(204, elevatorId);       // DOOR
+        bus.subscribe(112, elevatorId);       // DIRECTION
+        bus.subscribe(111, elevatorId);       // FLOOR
 
         //layout
         setAlignment(Pos.CENTER);
@@ -259,7 +246,12 @@ public class ElevatorPanel extends VBox {
                 poll(5, 0);          // Mode
                 poll(6, elevatorId);        // Start this car
                 poll(7, elevatorId);         // Stop this car
-                poll(9, elevatorId);         // Move this car (TEMP)
+                poll(102, elevatorId);
+                poll(202, elevatorId);
+                poll(204, elevatorId);
+                poll(112, elevatorId);
+                poll(111, elevatorId);
+
 
                 try {
                     Thread.sleep(10);
@@ -282,30 +274,34 @@ public class ElevatorPanel extends VBox {
     private void handleCommand(Message m) {
         int t  = m.getTopic();
         int st = m.getSubTopic();
-        int body = m.getBody();   // e.g. 0, 1000, 1100, 1110, or floor number for Topic 9
+        int body = m.getBody();   // e.g. 0, 1000, 1100, 1110, or floor number
 
         switch (t) {
             case 1 -> // System Stop (all)
                     Platform.runLater(() -> {
                         isEnabled = false;
                         applyEnabledUI();
-                        pauseMovement();
+                        // No movement logic here in Mode B
                     });
 
             case 2 -> // System Start (all)
                     Platform.runLater(() -> {
                         isEnabled = true;
                         applyEnabledUI();
-                        resumeMovementIfPending();
+                        // No movement logic here in Mode B
                     });
 
             case 3 -> // System Reset (all)
-                    Platform.runLater(this::resetToOne);
+                    Platform.runLater(() -> {
+                        // GUI will not auto-move during reset; simply clear fire flag and update UI
+                        isFireMode = false;
+                        // Optionally you could visually indicate reset, but do not move.
+                    });
 
             case 4 -> // Clear Fire (all)
                     Platform.runLater(() -> {
                         isFireMode = false;
-                        closeDoor();
+                        closeDoor(); // door visual only
                     });
 
             case 5 -> // Mode (body 1000 / 1100 / 1110)
@@ -318,7 +314,7 @@ public class ElevatorPanel extends VBox {
                             isFireMode = false;
                         } else if (body == 1110) {   // Test Fire
                             isFireMode = true;
-                            fireRecallToLobby();
+                            // Do NOT initiate fire recall movement here (Mode B)
                         }
                     });
 
@@ -327,7 +323,7 @@ public class ElevatorPanel extends VBox {
                     Platform.runLater(() -> {
                         isEnabled = true;
                         applyEnabledUI();
-                        resumeMovementIfPending();
+                        // No resume/pause logic here
                     });
                 }
             }
@@ -337,17 +333,54 @@ public class ElevatorPanel extends VBox {
                     Platform.runLater(() -> {
                         isEnabled = false;
                         applyEnabledUI();
-                        pauseMovement();
+                        // No pause logic here
                     });
                 }
             }
 
-            case 9 -> { // TEMP: move this elevator to floor = body
-                if (st == elevatorId) {
-                    int targetFloor = body;
-                    Platform.runLater(() -> moveTo(targetFloor));
-                }
-            }
+            case 102 -> // DISPATCH: highlight floor request
+                    Platform.runLater(() -> {
+                        // Body = assigned floor
+                        int assignedFloor = body;
+
+                        Direction d;
+                        if (assignedFloor > currentFloor) d = Direction.UP;
+                        else if (assignedFloor < currentFloor) d = Direction.DOWN;
+                        else d = Direction.IDLE;
+
+                        // Light the corresponding floor’s call indicator
+                        DualDotIndicatorPanel indicator = floorCallIndicators.get(assignedFloor);
+                        if (indicator != null) {
+                            if (d == Direction.UP)  indicator.setDotLit(Direction.UP, true);
+                            if (d == Direction.DOWN) indicator.setDotLit(Direction.DOWN, true);
+                        }
+                    });
+
+            case 202 -> // POSITION: update the elevator’s current position (animated)
+                    Platform.runLater(() ->
+                            updateElevatorPosition(body, true)
+                    );
+
+            case 204 -> // DOOR: 0=open, 1=closed
+                    Platform.runLater(() ->
+                            setDoorStatus(body == 0)
+                    );
+
+            case 112 -> // DIRECTION: 0=UP, 1=DOWN, 2=NONE
+                    Platform.runLater(() -> {
+                        switch (body) {
+                            case 0 -> setDirection(Direction.UP);
+                            case 1 -> setDirection(Direction.DOWN);
+                            default -> setDirection(Direction.IDLE);
+                        }
+                    });
+
+            case 111 -> // FLOOR DISPLAY NUMBER
+                    Platform.runLater(() -> {
+                        currentFloor = body;
+                        currentFloorDisplay.setText("" + body);
+                        carFloorLabel.setText("" + body);
+                    });
 
             default -> {
                 // ignore unknown topics
@@ -357,7 +390,7 @@ public class ElevatorPanel extends VBox {
 
 
 
-    // Movement & door helpers
+    // Movement display helper (animation only when POSITION messages arrive)
     private void updateElevatorPosition(int newFloor, boolean animate) {
         double targetY = (10 - newFloor) * TOTAL_FLOOR_HEIGHT;
         int floorsToTravel = Math.abs(newFloor - this.currentFloor);
@@ -399,94 +432,6 @@ public class ElevatorPanel extends VBox {
     }
 
 
-    /** Generic move helper, used by Topic 9. */
-    private void moveTo(int targetFloor) {
-        if (!isEnabled || isFireMode) return;
-
-        // Clamp between 1..10
-        int tf = Math.max(1, Math.min(10, targetFloor));
-        if (tf == currentFloor) return;
-
-        pendingTargetFloor = tf;
-        isMoving = true;
-
-        closeDoor();
-        setDirection(tf > currentFloor ? Direction.UP : Direction.DOWN);
-        updateElevatorPosition(tf, true);
-
-        elevatorAnimation.setOnFinished(e -> {
-            setDirection(Direction.IDLE);
-            setDoorStatus(true);
-            currentFloor = tf;
-            isMoving = false;
-            pendingTargetFloor = null;
-        });
-    }
-
-
-
-    /** Pause current movement for STOP/System Stop. */
-    private void pauseMovement() {
-        if (isMoving) {
-            elevatorAnimation.pause();
-        }
-    }
-
-
-    /** Resume movement if we had a target floor when START/System Start is pressed. */
-    private void resumeMovementIfPending() {
-        if (isMoving && !isFireMode && isEnabled) {
-            elevatorAnimation.play();
-        }
-    }
-
-
-    /** Fire recall to lobby floor 1, overriding any pending move. */
-    private void fireRecallToLobby() {
-        pendingTargetFloor = 1;
-        isMoving = true;
-        closeDoor();
-        setDirection(Direction.DOWN);
-        updateElevatorPosition(1, true);
-        elevatorAnimation.setOnFinished(e -> {
-            setDirection(Direction.IDLE);
-            setDoorStatus(true);
-            currentFloor = 1;
-            isMoving = false;
-            // remain in fire mode until CLEAR FIRE
-        });
-    }
-
-
-    /** Reset: go to floor 1, open doors, after 5s close then be ready. */
-    private void resetToOne() {
-        pendingTargetFloor = 1;
-        isFireMode = false;
-
-        closeDoor();
-        setDirection(Direction.DOWN);
-        updateElevatorPosition(1, true);
-        elevatorAnimation.setOnFinished(e -> {
-            setDirection(Direction.IDLE);
-            setDoorStatus(true);
-            currentFloor = 1;
-            isMoving = false;
-            pendingTargetFloor = null;
-
-            // after 5 seconds, close doors and be ready
-            new Thread(() -> {
-                try { Thread.sleep(5000); } catch (InterruptedException ignored) {}
-                Platform.runLater(() -> {
-                    closeDoor();
-                    isEnabled = true;
-                    applyEnabledUI();
-                });
-            }).start();
-        });
-    }
-
-
-
     // Getters
     public int getCurrentFloor()   { return currentFloor; }
     public boolean isDoorOpen()    { return isDoorOpen; }
@@ -494,3 +439,4 @@ public class ElevatorPanel extends VBox {
     public boolean isFireMode()    { return isFireMode; }
     public boolean isEnabled()     { return isEnabled; }
 }
+

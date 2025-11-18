@@ -1,8 +1,9 @@
-package GUI;
+package CommandCenter.GUI;
 
 import bus.SoftwareBus;
-import Message.Message;
+import CommandCenter.Messages.Message;
 
+import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
@@ -43,7 +44,6 @@ public class CommandPanel extends GridPane {
     private final Button fireControlButton;
     private final Button startButton;
     private final Button stopButton;
-    private final Button resetButton;
 
 
     // Local UI state (purely visual)
@@ -72,7 +72,6 @@ public class CommandPanel extends GridPane {
     private final String colorAuto = "-fx-background-color: #283593;";
     private final String colorStart = "-fx-background-color: #2E7D32;";
     private final String colorStop = "-fx-background-color: #B71C1C;";
-    private final String colorReset = "-fx-background-color: #212121;";
     private final String autoBorderOn  = "-fx-border-color: #FFEB3B;";
     private final String autoBorderOff = "-fx-border-color: rgba(255,255,255,0.10);";
     private final String fireBtnGlowOn  = "-fx-effect: dropshadow(gaussian, rgba(255,193,7,0.7), 18, 0.4, 0, 0);";
@@ -82,6 +81,8 @@ public class CommandPanel extends GridPane {
 
     public CommandPanel(SoftwareBus bus) {
         this.bus = bus;
+        // LISTEN FOR MODE UPDATES FROM THE BUS
+        bus.subscribe(5, 0);
 
         // Layout grid
         setStyle("-fx-background-color: #333333;");
@@ -131,15 +132,9 @@ public class CommandPanel extends GridPane {
                 e -> onStop());
         add(stopButton, 0, 10, 1, 2);
 
-
-
-        resetButton = createButton("RESET", Color.web("#212121"), 70,
-                e -> onReset());
-        add(resetButton, 0, 12, 1, 2);
-
-
-
         updateButtonStates(true);
+
+        startBusListener();
     }
 
     //bus publisher helpers
@@ -238,7 +233,6 @@ public class CommandPanel extends GridPane {
         stopButton.setDisable(!isRunning);
         fireControlButton.setDisable(!isRunning);
         autoButton.setDisable(!isRunning);
-        resetButton.setDisable(!isRunning);
 
         // keep labels readable even when disabled
         String keepOpacity = " -fx-opacity: 1.0;";
@@ -246,7 +240,6 @@ public class CommandPanel extends GridPane {
         stopButton.setStyle(stopButton.getStyle() + keepOpacity);
         fireControlButton.setStyle(fireControlButton.getStyle() + keepOpacity);
         autoButton.setStyle(autoButton.getStyle() + keepOpacity);
-        resetButton.setStyle(resetButton.getStyle() + keepOpacity);
     }
 
 
@@ -288,6 +281,108 @@ public class CommandPanel extends GridPane {
         }
 
     }
+
+    /**
+     * Background listener for CommandPanel.
+     * Polls the bus
+     */
+    private void startBusListener() {
+        Thread t = new Thread(() -> {
+            while (true) {
+
+                poll(1, 0);   // System Stop
+                poll(2, 0);   // System Start
+                poll(3, 0);   // System Reset
+                poll(4, 0);   // Clear Fire
+                poll(5, 0);   // Mode (1000/1100/1110)
+
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException ignored) {}
+            }
+        });
+
+        t.setDaemon(true);
+        t.start();
+    }
+
+
+    /** Polls the bus for a single topic/subtopic. */
+    private void poll(int topic, int subtopic) {
+        Message m = bus.get(topic, subtopic);
+        if (m != null) handleCommand(m);
+    }
+
+
+    /**
+     * Handle inbound BUS commands for CommandPanel.
+     * Mirrors the logic used in mode buttons.
+     */
+    private void handleCommand(Message m) {
+        int t    = m.getTopic();
+        int body = m.getBody();
+
+        switch (t) {
+
+            case 1 -> // System Stop
+                    Platform.runLater(() -> {
+                        systemRunning = false;
+                        updateButtonStates(false);
+                    });
+
+            case 2 -> // System Start
+                    Platform.runLater(() -> {
+                        systemRunning = true;
+                        updateButtonStates(true);
+                    });
+
+            case 3 -> // System Reset
+                    Platform.runLater(() -> {
+                        systemRunning = true;
+                        systemMode = "CENTRALIZED";
+                        updateForReset();
+                    });
+
+
+            case 4 -> // Clear Fire
+                    Platform.runLater(() -> {
+                        systemMode = "CENTRALIZED";
+                        updateForFireMode(false);        // remove fire styling
+                        updateForAutoMode("CENTRALIZED"); // restore auto button border
+                        modeDisplay.setText("CENTRALIZED");
+                        modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
+
+                        updateButtonStates(true); // start/stop buttons re-enable
+                    });
+
+            case 5 -> // Mode change body: 1000/1100/1110
+                    Platform.runLater(() -> {
+                        switch (body) {
+                            case 1000 -> {                 // CENTRALIZED
+                                systemMode = "CENTRALIZED";
+                                updateForAutoMode("CENTRALIZED");
+                            }
+
+                            case 1100 -> {                // INDEPENDENT
+                                systemMode = "INDEPENDENT";
+                                updateForAutoMode("INDEPENDENT");
+                            }
+
+                            case 1110 -> {                // TEST FIRE
+                                systemMode = "FIRE";
+                                updateForFireMode(true);
+                            }
+
+                            default -> System.out.println("CommandPanel: Unknown mode: " + body);
+                        }
+                    });
+
+            default -> {
+                // Ignore unrelated topics
+            }
+        }
+    }
+
 
 
 }
