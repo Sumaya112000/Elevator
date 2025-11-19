@@ -266,35 +266,35 @@ public class ElevatorPanel extends VBox {
     }
 
     private void handleCommand(Message m) {
-        String t = m.getTopic();
+        String t = Topic.fromCode(m.getTopic());
         int st = m.getSubTopic();
         int body = m.getBody();
 
         switch (t) {
-            case "1" -> // System Stop (all)
+            case "SYSTEM_STOP" -> // System Stop (all)
                     Platform.runLater(() -> {
                         isEnabled = false;
                         applyEnabledUI();
                     });
 
-            case "2" -> // System Start (all)
+            case "SYSTEM_START" -> // System Start (all)
                     Platform.runLater(() -> {
                         isEnabled = true;
                         applyEnabledUI();
                     });
 
-            case "3" -> // System Reset (all)
+            case "SYSTEM_RESET" -> // System Reset (all)
                     Platform.runLater(() -> {
                         isFireMode = false;
                     });
 
-            case "4" -> // Clear Fire (all)
+            case "CLEAR_FIRE" -> // Clear Fire (all)
                     Platform.runLater(() -> {
                         isFireMode = false;
                         closeDoor();
                     });
 
-            case "5" -> // Mode (body 1000 / 1100 / 1110)
+            case "MODE" -> // Mode (body 1000 / 1100 / 1110)
                     Platform.runLater(() -> {
                         if (body == 1000) {          // Centralized
                             autoMode = false;
@@ -307,7 +307,7 @@ public class ElevatorPanel extends VBox {
                         }
                     });
 
-            case "6" -> { // Start this elevator
+            case "START_ONE" -> { // Start this elevator
                 if (st == elevatorId) {
                     Platform.runLater(() -> {
                         isEnabled = true;
@@ -316,7 +316,7 @@ public class ElevatorPanel extends VBox {
                 }
             }
 
-            case "7" -> { // Stop this elevator
+            case "STOP_ONE" -> { // Stop this elevator
                 if (st == elevatorId) {
                     Platform.runLater(() -> {
                         isEnabled = false;
@@ -325,7 +325,7 @@ public class ElevatorPanel extends VBox {
                 }
             }
 
-            case "102" -> // DISPATCH
+            case "DISPATCH" -> // DISPATCH
                     Platform.runLater(() -> {
                         int assignedFloor = body;
                         Direction d;
@@ -340,13 +340,13 @@ public class ElevatorPanel extends VBox {
                         }
                     });
 
-            case "202" -> // POSITION
+            case "POSITION" -> // POSITION
                     Platform.runLater(() -> updateElevatorPosition(body, true));
 
-            case "204" -> // DOOR
+            case "DOOR" -> // DOOR
                     Platform.runLater(() -> setDoorStatus(body == 0));
 
-            case "112" -> // DIRECTION
+            case "DIRECTION" -> // DIRECTION
                     Platform.runLater(() -> {
                         switch (body) {
                             case 0 -> setDirection(Direction.UP);
@@ -355,7 +355,7 @@ public class ElevatorPanel extends VBox {
                         }
                     });
 
-            case "111" -> // FLOOR
+            case "FLOOR" -> // FLOOR
                     Platform.runLater(() -> {
                         currentFloor = body;
                         currentFloorDisplay.setText("" + body);

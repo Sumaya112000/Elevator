@@ -1,5 +1,7 @@
 package CommandCenter.Messages;
 
+import java.sql.SQLOutput;
+
 /**
  * Topic codes matching the spreadsheet spec.
  * Using numeric strings to maintain compatibility.
@@ -24,8 +26,8 @@ public enum Topic {
     public String code() { return code; }
 
     // Reverse lookup
-    public static Topic fromCode(String code) {
-        for (Topic t : values()) if (t.code.equals(code)) return t;
+    public static String fromCode(String code) {
+        for (Topic t : values()) if (t.code.equals(code)) return t.toString();
         return null;
     }
 }

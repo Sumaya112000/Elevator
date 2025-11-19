@@ -306,30 +306,30 @@ public class CommandPanel extends GridPane {
     }
 
     private void handleCommand(Message m) {
-        String t = m.getTopic();
+        String t = Topic.fromCode(m.getTopic());
         int body = m.getBody();
 
         switch (t) {
-            case "1" -> // System Stop
+            case "SYSTEM_STOP" -> // System Stop
                     Platform.runLater(() -> {
                         systemRunning = false;
                         updateButtonStates(false);
                     });
 
-            case "2" -> // System Start
+            case "SYSTEM_START" -> // System Start
                     Platform.runLater(() -> {
                         systemRunning = true;
                         updateButtonStates(true);
                     });
 
-            case "3" -> // System Reset
+            case "SYSTEM_RESET" -> // System Reset
                     Platform.runLater(() -> {
                         systemRunning = true;
                         systemMode = "CENTRALIZED";
                         updateForReset();
                     });
 
-            case "4" -> // Clear Fire
+            case "CLEAR_FIRE" -> // Clear Fire
                     Platform.runLater(() -> {
                         systemMode = "CENTRALIZED";
                         updateForFireMode(false);        // remove fire styling
@@ -339,7 +339,7 @@ public class CommandPanel extends GridPane {
                         updateButtonStates(true); // start/stop buttons re-enable
                     });
 
-            case "5" -> // Mode change body: 1000/1100/1110
+            case "MODE" -> // Mode change body: 1000/1100/1110
                     Platform.runLater(() -> {
                         switch (body) {
                             case B_MODE_CEN -> {                 // CENTRALIZED
