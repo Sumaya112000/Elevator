@@ -2,7 +2,6 @@ package TestCode;
 
 import bus.SoftwareBus;
 import CommandCenter.Messages.Message;
-import CommandCenter.Messages.BusSpec;
 import CommandCenter.Messages.Topic;
 import java.util.Random;
 
@@ -16,21 +15,20 @@ public class TestHarness {
         Thread.sleep(2000);
 
         System.out.println("START ALL");
-        bus.publish(new Message(BusSpec.T_SYSTEM_START,0,0));
+        bus.publish(new Message(Topic.SYSTEM_START.code(), 0, 0));
         Thread.sleep(1000);
 
         System.out.println("STOP E1");
-        bus.publish(new Message(BusSpec.T_STOP_ONE,1,0));
+        bus.publish(new Message(Topic.STOP_ONE.code(), 1, 0));
         Thread.sleep(2000);
 
         System.out.println("START E1");
-        bus.publish(new Message(BusSpec.T_START_ONE,1,0));
+        bus.publish(new Message(Topic.START_ONE.code(), 1, 0));
         Thread.sleep(2000);
-
 
         // fire
         System.out.println("\n=== TEST FIRE MODE ===");
-        bus.publish(new Message(BusSpec.T_MODE,0,BusSpec.B_MODE_TF));  // enter FIRE
+        bus.publish(new Message(Topic.MODE.code(), 0, 1110));  // enter FIRE
         Thread.sleep(300);
 
         System.out.println("All elevators recalling to floor 1 … (simultaneous)");
@@ -72,9 +70,8 @@ public class TestHarness {
         Thread.sleep(3000);
 
         System.out.println("AUTO CLEAR FIRE");
-        bus.publish(new Message(BusSpec.T_CLEAR_FIRE,0,0)); // Clear Fire
+        bus.publish(new Message(Topic.CLEAR_FIRE.code(), 0, 0)); // Clear Fire
         Thread.sleep(400);
-
 
         // Close doors and refresh GUI
         for (int id = 1; id <= 4; id++) {
@@ -83,7 +80,6 @@ public class TestHarness {
             bus.publish(new Message(Topic.DOOR.code(), id, 1));
             Thread.sleep(200);
         }
-
 
         System.out.println("MOVING ALL 4 ELEVATORS TO RANDOM FLOORS WITH DOORS...");
 

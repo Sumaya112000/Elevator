@@ -1,8 +1,8 @@
 package CommandCenter.GUI;
 
 import CommandCenter.Messages.Message;
-import CommandCenter.Messages.BusSpec;
-import CommandCenter.Messages.Topic;import bus.SoftwareBus;
+import CommandCenter.Messages.Topic;
+import bus.SoftwareBus;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -113,23 +113,21 @@ public class ElevatorPanel extends VBox {
     public ElevatorPanel(int id) {
         super(3);
         this.elevatorId = id;
-
-        // Each panel is its own BUS client
         this.bus = new SoftwareBus(false);
 
-        // Subscribe to all spreadsheet topics relevant for this car
-        bus.subscribe(BusSpec.T_SYSTEM_STOP, 0);          // System Stop
-        bus.subscribe(BusSpec.T_SYSTEM_START, 0);          // System Start
-        bus.subscribe(BusSpec.T_SYSTEM_RESET, 0);          // System Reset
-        bus.subscribe(BusSpec.T_CLEAR_FIRE, 0);          // Clear Fire
-        bus.subscribe(BusSpec.T_MODE, 0);          // Mode (Centralized / Independent / Test Fire)
-        bus.subscribe(BusSpec.T_START_ONE, elevatorId);         // Start this elevator
-        bus.subscribe(BusSpec.T_STOP_ONE, elevatorId);         // Stop this elevator
+        // Subscribe to all topics relevant for this car
+        bus.subscribe(Topic.SYSTEM_STOP.code(), 0);          // System Stop
+        bus.subscribe(Topic.SYSTEM_START.code(), 0);          // System Start
+        bus.subscribe(Topic.SYSTEM_RESET.code(), 0);          // System Reset
+        bus.subscribe(Topic.CLEAR_FIRE.code(), 0);          // Clear Fire
+        bus.subscribe(Topic.MODE.code(), 0);          // Mode
+        bus.subscribe(Topic.START_ONE.code(), elevatorId);         // Start this elevator
+        bus.subscribe(Topic.STOP_ONE.code(), elevatorId);         // Stop this elevator
         bus.subscribe(Topic.DISPATCH.code(), elevatorId);       // DISPATCH
         bus.subscribe(Topic.POSITION.code(), elevatorId);       // POSITION
         bus.subscribe(Topic.DOOR.code(), elevatorId);       // DOOR
         bus.subscribe(Topic.DIRECTION.code(), elevatorId);       // DIRECTION
-        bus.subscribe(Topic.FLOOR.code(), elevatorId);       // FLOOR
+        bus.subscribe(Topic.FLOOR.code(), elevatorId);       // FLOOR      // FLOOR
 
         //layout
         setAlignment(Pos.CENTER);
@@ -240,13 +238,13 @@ public class ElevatorPanel extends VBox {
     private void startBusListener() {
         Thread t = new Thread(() -> {
             while (true) {
-                poll(BusSpec.T_SYSTEM_STOP, 0);          // System Stop
-                poll(BusSpec.T_SYSTEM_START, 0);          // System Start
-                poll(BusSpec.T_SYSTEM_RESET, 0);          // System Reset
-                poll(BusSpec.T_CLEAR_FIRE, 0);          // Clear Fire
-                poll(BusSpec.T_MODE, 0);          // Mode
-                poll(BusSpec.T_START_ONE, elevatorId);        // Start this car
-                poll(BusSpec.T_STOP_ONE, elevatorId);         // Stop this car
+                poll(Topic.SYSTEM_STOP.code(), 0);          // System Stop
+                poll(Topic.SYSTEM_START.code(), 0);          // System Start
+                poll(Topic.SYSTEM_RESET.code(), 0);          // System Reset
+                poll(Topic.CLEAR_FIRE.code(), 0);          // Clear Fire
+                poll(Topic.MODE.code(), 0);          // Mode
+                poll(Topic.START_ONE.code(), elevatorId);        // Start this car
+                poll(Topic.STOP_ONE.code(), elevatorId);         // Stop this car
                 poll(Topic.DISPATCH.code(), elevatorId);
                 poll(Topic.POSITION.code(), elevatorId);
                 poll(Topic.DOOR.code(), elevatorId);
@@ -268,83 +266,73 @@ public class ElevatorPanel extends VBox {
     }
 
     private void handleCommand(Message m) {
-        String t  = m.getTopic();
+        String t = m.getTopic();
         int st = m.getSubTopic();
-        int body = m.getBody();   // e.g. 0, 1000, 1100, 1110, or floor number
+        int body = m.getBody();
 
         switch (t) {
-            case BusSpec.T_SYSTEM_STOP -> // System Stop (all)
+            case "1" -> // System Stop (all)
                     Platform.runLater(() -> {
                         isEnabled = false;
                         applyEnabledUI();
-                        // No movement logic here in Mode B
                     });
 
-            case BusSpec.T_SYSTEM_START -> // System Start (all)
+            case "2" -> // System Start (all)
                     Platform.runLater(() -> {
                         isEnabled = true;
                         applyEnabledUI();
-                        // No movement logic here in Mode B
                     });
 
-            case BusSpec.T_SYSTEM_RESET -> // System Reset (all)
-                    Platform.runLater(() -> {
-                        // GUI will not auto-move during reset; simply clear fire flag and update UI
-                        isFireMode = false;
-                        // Optionally you could visually indicate reset, but do not move.
-                    });
-
-            case BusSpec.T_CLEAR_FIRE -> // Clear Fire (all)
+            case "3" -> // System Reset (all)
                     Platform.runLater(() -> {
                         isFireMode = false;
-                        closeDoor(); // door visual only
                     });
 
-            case BusSpec.T_MODE -> // Mode (body 1000 / 1100 / 1110)
+            case "4" -> // Clear Fire (all)
                     Platform.runLater(() -> {
-                        if (body == BusSpec.B_MODE_CEN) {          // Centralized
+                        isFireMode = false;
+                        closeDoor();
+                    });
+
+            case "5" -> // Mode (body 1000 / 1100 / 1110)
+                    Platform.runLater(() -> {
+                        if (body == 1000) {          // Centralized
                             autoMode = false;
                             isFireMode = false;
-                        } else if (body == BusSpec.B_MODE_IND) {    // Independent
+                        } else if (body == 1100) {    // Independent
                             autoMode = true;
                             isFireMode = false;
-                        } else if (body == BusSpec.B_MODE_TF) {   // Test Fire
+                        } else if (body == 1110) {   // Test Fire
                             isFireMode = true;
-                            // Do NOT initiate fire recall movement here (Mode B)
                         }
                     });
 
-            case BusSpec.T_START_ONE -> { // Start this elevator (subtopic == elevatorId)
+            case "6" -> { // Start this elevator
                 if (st == elevatorId) {
                     Platform.runLater(() -> {
                         isEnabled = true;
                         applyEnabledUI();
-                        // No resume/pause logic here
                     });
                 }
             }
 
-            case BusSpec.T_STOP_ONE -> { // Stop this elevator (subtopic == elevatorId)
+            case "7" -> { // Stop this elevator
                 if (st == elevatorId) {
                     Platform.runLater(() -> {
                         isEnabled = false;
                         applyEnabledUI();
-                        // No pause logic here
                     });
                 }
             }
 
-            case "DISPATCH" -> // DISPATCH: highlight floor request
+            case "102" -> // DISPATCH
                     Platform.runLater(() -> {
-                        // Body = assigned floor
                         int assignedFloor = body;
-
                         Direction d;
                         if (assignedFloor > currentFloor) d = Direction.UP;
                         else if (assignedFloor < currentFloor) d = Direction.DOWN;
                         else d = Direction.IDLE;
 
-                        // Light the corresponding floor’s call indicator
                         DualDotIndicatorPanel indicator = floorCallIndicators.get(assignedFloor);
                         if (indicator != null) {
                             if (d == Direction.UP)  indicator.setDotLit(Direction.UP, true);
@@ -352,17 +340,13 @@ public class ElevatorPanel extends VBox {
                         }
                     });
 
-            case "POSITION" -> // POSITION: update the elevator’s current position (animated)
-                    Platform.runLater(() ->
-                            updateElevatorPosition(body, true)
-                    );
+            case "202" -> // POSITION
+                    Platform.runLater(() -> updateElevatorPosition(body, true));
 
-            case "DOOR" -> // DOOR: 0=open, 1=closed
-                    Platform.runLater(() ->
-                            setDoorStatus(body == 0)
-                    );
+            case "204" -> // DOOR
+                    Platform.runLater(() -> setDoorStatus(body == 0));
 
-            case "DIRECTION" -> // DIRECTION: 0=UP, 1=DOWN, 2=NONE
+            case "112" -> // DIRECTION
                     Platform.runLater(() -> {
                         switch (body) {
                             case 0 -> setDirection(Direction.UP);
@@ -371,7 +355,7 @@ public class ElevatorPanel extends VBox {
                         }
                     });
 
-            case "FLOOR" -> // FLOOR DISPLAY NUMBER
+            case "111" -> // FLOOR
                     Platform.runLater(() -> {
                         currentFloor = body;
                         currentFloorDisplay.setText("" + body);
