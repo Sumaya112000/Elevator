@@ -13,7 +13,7 @@ import java.util.*;
 
 public class SoftwareBus {
 
-    private record Subscription(int topic, int subtopic) {
+    private record Subscription(String topic, int subtopic) {
     }
 
     // Local queue for received messages that match this processor's subscriptions
@@ -163,7 +163,7 @@ public class SoftwareBus {
     /**
      * Registers a subscription to a given topic and subtopic.
      */
-    public void subscribe(int topic, int subtopic) {
+    public void subscribe(String topic, int subtopic) {
         subscriptions.add(new Subscription(topic, subtopic));
     }
 
@@ -172,7 +172,7 @@ public class SoftwareBus {
      * If subtopic = 0, matches all subtopics.
      * Returns null if no matching message is found.
      */
-    public Message get(int topic, int subtopic) {
+    public Message get(String topic, int subtopic) {
         synchronized (queue) {
             if (isServer) {
                 if (queue.isEmpty()) {
@@ -187,7 +187,7 @@ public class SoftwareBus {
             while (queue_iter.hasNext()) {
                 Message m = queue_iter.next();
                 System.out.println(m.toString());
-                if (m.getTopic() == topic && (subtopic == 0 || m.getSubTopic() == subtopic)) {
+                if (m.getTopic().equals(topic) && (subtopic == 0 || m.getSubTopic() == subtopic)) {
                     queue_iter.remove();
                     return m;
                 }
