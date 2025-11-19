@@ -26,8 +26,8 @@ public enum Topic {
     public String code() { return code; }
 
     // Reverse lookup
-    public static Topic fromCode(String code) {
-        for (Topic t : values()) if (t.code.equals(code)) return t;
+    public static String fromCode(String code) {
+        for (Topic t : values()) if (t.code.equals(code)) return t.toString();
         return null;
     }
 }
