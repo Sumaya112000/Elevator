@@ -2,7 +2,6 @@ package CommandCenter.GUI;
 
 import bus.SoftwareBus;
 import CommandCenter.Messages.Message;
-import CommandCenter.Messages.BusSpec;
 
 import javafx.application.Platform;
 import javafx.scene.control.Button;
@@ -83,7 +82,7 @@ public class CommandPanel extends GridPane {
     public CommandPanel(SoftwareBus bus) {
         this.bus = bus;
         // LISTEN FOR MODE UPDATES FROM THE BUS
-        bus.subscribe(BusSpec.T_MODE, 0);
+        bus.subscribe(5, 0);
 
         // Layout grid
         setStyle("-fx-background-color: #333333;");
@@ -141,58 +140,64 @@ public class CommandPanel extends GridPane {
     //bus publisher helpers
 
     /** Broadcast a message to all elevators (subtopic = 0). */
-    private void publishAll(String topic, int body) {
+    private void publishAll(int topic, int body) {
         bus.publish(new Message(topic, 0, body));
     }
 
+
     /** Send a message to one elevator (subtopic = elevatorId 1..4). */
-    public void publishToCar(String topic, int elevatorId, int body) {
+    public void publishToCar(int topic, int elevatorId, int body) {
         if (elevatorId < 1 || elevatorId > 4) return;
         bus.publish(new Message(topic, elevatorId, body));
     }
 
+
     //button handlers
     private void onStart() {
         systemRunning = true;
-        publishAll(BusSpec.T_SYSTEM_START, 0); // System Start
+        publishAll(2, 0); // System Start
         updateButtonStates(true);
     }
 
+
     private void onStop() {
         systemRunning = false;
-        publishAll(BusSpec.T_SYSTEM_STOP, 0); // System Stop
+        publishAll(1, 0); // System Stop
         updateButtonStates(false);
     }
+
 
     private void onReset() {
         systemRunning = true;
         systemMode = "CENTRALIZED";
-        publishAll(BusSpec.T_SYSTEM_RESET, 0); // System Reset
+        publishAll(3, 0); // System Reset
         updateForReset();
     }
+
 
     private void onFirePressed() {
         if ("FIRE".equals(systemMode)) {
             systemMode = "CENTRALIZED";
-            publishAll(BusSpec.T_CLEAR_FIRE, 0);    // Clear Fire
+            publishAll(4, 0);    // Clear Fire
             updateForFireMode(false);
         } else {
             systemMode = "FIRE";
-            publishAll(BusSpec.T_MODE, BusSpec.B_MODE_TF); // Test Fire
+            publishAll(5, 1110); // Test Fire
             updateForFireMode(true);
         }
     }
+
 
     private void onAutoPressed() {
         if ("FIRE".equals(systemMode)) return; // ignore during FIRE
 
         if ("CENTRALIZED".equals(systemMode)) {
             systemMode = "INDEPENDENT";
-            publishAll(BusSpec.T_MODE, BusSpec.B_MODE_IND); // Mode: Independent
+            publishAll(5, 1100); // Mode: Independent
             updateForAutoMode("INDEPENDENT");
         } else {
             systemMode = "CENTRALIZED";
-            publishAll(BusSpec.T_MODE, BusSpec.B_MODE_CEN); // Mode: Centralized
+            publishAll(5, 1000); // Mode: Centralized
             updateForAutoMode("CENTRALIZED");
         }
     }
@@ -284,11 +289,12 @@ public class CommandPanel extends GridPane {
     private void startBusListener() {
         Thread t = new Thread(() -> {
             while (true) {
-                poll(BusSpec.T_SYSTEM_STOP, 0);   // System Stop
-                poll(BusSpec.T_SYSTEM_START, 0);   // System Start
-                poll(BusSpec.T_SYSTEM_RESET, 0);   // System Reset
-                poll(BusSpec.T_CLEAR_FIRE, 0);   // Clear Fire
-                poll(BusSpec.T_MODE, 0);   // Mode (1000/1100/1110)
+
+                poll(1, 0);   // System Stop
+                poll(2, 0);   // System Start
+                poll(3, 0);   // System Reset
+                poll(4, 0);   // Clear Fire
+                poll(5, 0);   // Mode (1000/1100/1110)
 
                 try {
                     Thread.sleep(10);
@@ -300,41 +306,45 @@ public class CommandPanel extends GridPane {
         t.start();
     }
 
+
     /** Polls the bus for a single topic/subtopic. */
-    private void poll(String topic, int subtopic) {
+    private void poll(int topic, int subtopic) {
         Message m = bus.get(topic, subtopic);
         if (m != null) handleCommand(m);
     }
+
 
     /**
      * Handle inbound BUS commands for CommandPanel.
      * Mirrors the logic used in mode buttons.
      */
     private void handleCommand(Message m) {
-        String t    = m.getTopic();
+        int t    = m.getTopic();
         int body = m.getBody();
 
         switch (t) {
-            case BusSpec.T_SYSTEM_STOP -> // System Stop
+
+            case 1 -> // System Stop
                     Platform.runLater(() -> {
                         systemRunning = false;
                         updateButtonStates(false);
                     });
 
-            case BusSpec.T_SYSTEM_START -> // System Start
+            case 2 -> // System Start
                     Platform.runLater(() -> {
                         systemRunning = true;
                         updateButtonStates(true);
                     });
 
-            case BusSpec.T_SYSTEM_RESET -> // System Reset
+            case 3 -> // System Reset
                     Platform.runLater(() -> {
                         systemRunning = true;
                         systemMode = "CENTRALIZED";
                         updateForReset();
                     });
 
-            case BusSpec.T_CLEAR_FIRE -> // Clear Fire
+
+            case 4 -> // Clear Fire
                     Platform.runLater(() -> {
                         systemMode = "CENTRALIZED";
                         updateForFireMode(false);        // remove fire styling
@@ -345,20 +355,20 @@ public class CommandPanel extends GridPane {
                         updateButtonStates(true); // start/stop buttons re-enable
                     });
 
-            case BusSpec.T_MODE -> // Mode change body: 1000/1100/1110
+            case 5 -> // Mode change body: 1000/1100/1110
                     Platform.runLater(() -> {
                         switch (body) {
-                            case BusSpec.B_MODE_CEN -> {                 // CENTRALIZED
+                            case 1000 -> {                 // CENTRALIZED
                                 systemMode = "CENTRALIZED";
                                 updateForAutoMode("CENTRALIZED");
                             }
 
-                            case BusSpec.B_MODE_IND -> {                // INDEPENDENT
+                            case 1100 -> {                // INDEPENDENT
                                 systemMode = "INDEPENDENT";
                                 updateForAutoMode("INDEPENDENT");
                             }
 
-                            case BusSpec.B_MODE_TF -> {                // TEST FIRE
+                            case 1110 -> {                // TEST FIRE
                                 systemMode = "FIRE";
                                 updateForFireMode(true);
                             }
@@ -372,4 +382,7 @@ public class CommandPanel extends GridPane {
             }
         }
     }
+
+
+
 }

@@ -1,6 +1,7 @@
 package bus;
 
 import CommandCenter.Messages.Message;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,9 +10,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 
+
 public class SoftwareBus {
 
-    private record Subscription(String topic, int subtopic) {
+    private record Subscription(int topic, int subtopic) {
     }
 
     // Local queue for received messages that match this processor's subscriptions
@@ -113,7 +115,7 @@ public class SoftwareBus {
                         // Client mode: filter and enqueue matching messages
                         synchronized (subscriptions) {
                             for (Subscription s : subscriptions) {
-                                if (s.topic().equals(message.getTopic()) &&
+                                if (s.topic() == message.getTopic() &&
                                         (s.subtopic() == 0 || s.subtopic() == message.getSubTopic())) {
                                     synchronized (queue) {
                                         queue.add(message);
@@ -161,7 +163,7 @@ public class SoftwareBus {
     /**
      * Registers a subscription to a given topic and subtopic.
      */
-    public void subscribe(String topic, int subtopic) {
+    public void subscribe(int topic, int subtopic) {
         subscriptions.add(new Subscription(topic, subtopic));
     }
 
@@ -170,7 +172,7 @@ public class SoftwareBus {
      * If subtopic = 0, matches all subtopics.
      * Returns null if no matching message is found.
      */
-    public Message get(String topic, int subtopic) {
+    public Message get(int topic, int subtopic) {
         synchronized (queue) {
             if (isServer) {
                 if (queue.isEmpty()) {
@@ -185,7 +187,7 @@ public class SoftwareBus {
             while (queue_iter.hasNext()) {
                 Message m = queue_iter.next();
                 System.out.println(m.toString());
-                if (m.getTopic().equals(topic) && (subtopic == 0 || m.getSubTopic() == subtopic)) {
+                if (m.getTopic() == topic && (subtopic == 0 || m.getSubTopic() == subtopic)) {
                     queue_iter.remove();
                     return m;
                 }
