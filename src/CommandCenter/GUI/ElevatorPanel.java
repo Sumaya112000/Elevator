@@ -2,7 +2,7 @@ package CommandCenter.GUI;
 
 import CommandCenter.Messages.Message;
 import CommandCenter.Messages.Topic;
-import bus.SoftwareBus;
+import CommandCenter.bus.SoftwareBus;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -260,7 +260,7 @@ public class ElevatorPanel extends VBox {
         t.start();
     }
 
-    private void poll(String topic, int subtopic) {
+    private void poll(int topic, int subtopic) {
         Message m = bus.get(topic, subtopic);
         if (m != null) handleCommand(m);
     }

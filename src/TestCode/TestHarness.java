@@ -1,6 +1,6 @@
 package TestCode;
 
-import bus.SoftwareBus;
+import CommandCenter.bus.SoftwareBus;
 import CommandCenter.Messages.Message;
 import CommandCenter.Messages.Topic;
 import java.util.Random;

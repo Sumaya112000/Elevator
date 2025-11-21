@@ -9,7 +9,7 @@ import javafx.stage.Stage;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 
-import bus.SoftwareBus;
+import CommandCenter.bus.SoftwareBus;
 
 public class ElevatorControlSystem extends Application {
 

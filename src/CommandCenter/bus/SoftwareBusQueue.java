@@ -1,6 +1,6 @@
-package bus;
+package CommandCenter.bus;
 
-import Message.Message;
+import CommandCenter.Messages.Message;
 
 import java.util.Iterator;
 import java.util.LinkedList;

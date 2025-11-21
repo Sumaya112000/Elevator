@@ -1,6 +1,6 @@
 package CommandCenter.GUI;
 
-import bus.SoftwareBus;
+import CommandCenter.bus.SoftwareBus;
 import CommandCenter.Messages.Message;
 import CommandCenter.Messages.Topic;
 
@@ -143,11 +143,11 @@ public class CommandPanel extends GridPane {
     }
 
     //bus publisher helpers
-    private void publishAll(String topic, int body) {
+    private void publishAll(int topic, int body) {
         bus.publish(new Message(topic, 0, body));
     }
 
-    public void publishToCar(String topic, int elevatorId, int body) {
+    public void publishToCar(int topic, int elevatorId, int body) {
         if (elevatorId < 1 || elevatorId > 4) return;
         bus.publish(new Message(topic, elevatorId, body));
     }
@@ -300,7 +300,7 @@ public class CommandPanel extends GridPane {
         t.start();
     }
 
-    private void poll(String topic, int subtopic) {
+    private void poll(int topic, int subtopic) {
         Message m = bus.get(topic, subtopic);
         if (m != null) handleCommand(m);
     }
