@@ -1,4 +1,4 @@
-package CommandCenter.GUI;
+package CommandCenter;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -9,7 +9,7 @@ import javafx.stage.Stage;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 
-import CommandCenter.bus.SoftwareBus;
+import Bus.*;
 
 public class ElevatorControlSystem extends Application {
 

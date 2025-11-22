@@ -1,8 +1,7 @@
-package CommandCenter.GUI;
+package CommandCenter;
 
-import CommandCenter.bus.SoftwareBus;
-import CommandCenter.Messages.Message;
-import CommandCenter.Messages.Topic;
+import Bus.*;
+import Message.*;
 
 import javafx.application.Platform;
 import javafx.scene.control.Button;
@@ -87,7 +86,7 @@ public class CommandPanel extends GridPane {
     public CommandPanel(SoftwareBus bus) {
         this.bus = bus;
         // LISTEN FOR MODE UPDATES FROM THE BUS
-        bus.subscribe(Topic.MODE.code(), 0);
+        bus.subscribe(TopicCodes.MODE.code(), 0);
 
         // Layout grid
         setStyle("-fx-background-color: #333333;");
@@ -155,31 +154,31 @@ public class CommandPanel extends GridPane {
     //button handlers
     private void onStart() {
         systemRunning = true;
-        publishAll(Topic.SYSTEM_START.code(), 0); // System Start
+        publishAll(TopicCodes.SYSTEM_START.code(), 0); // System Start
         updateButtonStates(true);
     }
 
     private void onStop() {
         systemRunning = false;
-        publishAll(Topic.SYSTEM_STOP.code(), 0); // System Stop
+        publishAll(TopicCodes.SYSTEM_STOP.code(), 0); // System Stop
         updateButtonStates(false);
     }
 
     private void onReset() {
         systemRunning = true;
         systemMode = "CENTRALIZED";
-        publishAll(Topic.SYSTEM_RESET.code(), 0); // System Reset
+        publishAll(TopicCodes.SYSTEM_RESET.code(), 0); // System Reset
         updateForReset();
     }
 
     private void onFirePressed() {
         if ("FIRE".equals(systemMode)) {
             systemMode = "CENTRALIZED";
-            publishAll(Topic.CLEAR_FIRE.code(), 0);    // Clear Fire
+            publishAll(TopicCodes.CLEAR_FIRE.code(), 0);    // Clear Fire
             updateForFireMode(false);
         } else {
             systemMode = "FIRE";
-            publishAll(Topic.MODE.code(), B_MODE_TF); // Test Fire
+            publishAll(TopicCodes.MODE.code(), B_MODE_TF); // Test Fire
             updateForFireMode(true);
         }
     }
@@ -189,11 +188,11 @@ public class CommandPanel extends GridPane {
 
         if ("CENTRALIZED".equals(systemMode)) {
             systemMode = "INDEPENDENT";
-            publishAll(Topic.MODE.code(), B_MODE_IND); // Mode: Independent
+            publishAll(TopicCodes.MODE.code(), B_MODE_IND); // Mode: Independent
             updateForAutoMode("INDEPENDENT");
         } else {
             systemMode = "CENTRALIZED";
-            publishAll(Topic.MODE.code(), B_MODE_CEN); // Mode: Centralized
+            publishAll(TopicCodes.MODE.code(), B_MODE_CEN); // Mode: Centralized
             updateForAutoMode("CENTRALIZED");
         }
     }
@@ -285,11 +284,11 @@ public class CommandPanel extends GridPane {
     private void startBusListener() {
         Thread t = new Thread(() -> {
             while (true) {
-                poll(Topic.SYSTEM_STOP.code(), 0);   // System Stop
-                poll(Topic.SYSTEM_START.code(), 0);   // System Start
-                poll(Topic.SYSTEM_RESET.code(), 0);   // System Reset
-                poll(Topic.CLEAR_FIRE.code(), 0);   // Clear Fire
-                poll(Topic.MODE.code(), 0);   // Mode (1000/1100/1110)
+                poll(TopicCodes.SYSTEM_STOP.code(), 0);   // System Stop
+                poll(TopicCodes.SYSTEM_START.code(), 0);   // System Start
+                poll(TopicCodes.SYSTEM_RESET.code(), 0);   // System Reset
+                poll(TopicCodes.CLEAR_FIRE.code(), 0);   // Clear Fire
+                poll(TopicCodes.MODE.code(), 0);   // Mode (1000/1100/1110)
 
                 try {
                     Thread.sleep(10);
@@ -306,7 +305,7 @@ public class CommandPanel extends GridPane {
     }
 
     private void handleCommand(Message m) {
-        String t = Topic.fromCode(m.getTopic());
+        String t = TopicCodes.fromCode(m.getTopic());
         int body = m.getBody();
 
         switch (t) {

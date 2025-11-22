@@ -1,12 +1,10 @@
-package CommandCenter.Messages;
-
-import java.sql.SQLOutput;
+package Message;
 
 /**
  * Topic codes matching the spreadsheet spec.
  * Using numeric strings to maintain compatibility.
  */
-public enum Topic {
+public enum TopicCodes {
     SYSTEM_STOP   (1),    // all elevators
     SYSTEM_START  (2),    // all elevators
     SYSTEM_RESET  (3),    // all elevators
@@ -22,12 +20,12 @@ public enum Topic {
     FLOOR         (111);  // subTopic = 1..4 (body = floor number)
 
     private final int code;
-    Topic(int code) { this.code = code; }
+    TopicCodes(int code) { this.code = code; }
     public int code() { return code; }
 
     // Reverse lookup
     public static String fromCode(int code) {
-        for (Topic t : values()) if (t.code == code) return t.toString();
+        for (TopicCodes t : values()) if (t.code == code) return t.toString();
         return null;
     }
 }

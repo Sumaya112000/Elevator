@@ -1,10 +1,8 @@
-package CommandCenter.bus;
-
-import CommandCenter.Messages.Message;
-
+package Bus;
 
 import java.util.*;
 
+import Message.*;
 
 public class SoftwareBus {
 

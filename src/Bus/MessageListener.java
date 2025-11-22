@@ -1,7 +1,8 @@
-package CommandCenter.bus;
+package Bus;
 
-import CommandCenter.Messages.Message;
+import Message.*;
 
 public interface MessageListener {
     void onMessage(Message message);
 }
+

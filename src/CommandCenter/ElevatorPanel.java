@@ -1,8 +1,7 @@
-package CommandCenter.GUI;
+package CommandCenter;
 
-import CommandCenter.Messages.Message;
-import CommandCenter.Messages.Topic;
-import CommandCenter.bus.SoftwareBus;
+import Message.*;
+import Bus.*;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -116,18 +115,18 @@ public class ElevatorPanel extends VBox {
         this.bus = new SoftwareBus(false);
 
         // Subscribe to all topics relevant for this car
-        bus.subscribe(Topic.SYSTEM_STOP.code(), 0);          // System Stop
-        bus.subscribe(Topic.SYSTEM_START.code(), 0);          // System Start
-        bus.subscribe(Topic.SYSTEM_RESET.code(), 0);          // System Reset
-        bus.subscribe(Topic.CLEAR_FIRE.code(), 0);          // Clear Fire
-        bus.subscribe(Topic.MODE.code(), 0);          // Mode
-        bus.subscribe(Topic.START_ONE.code(), elevatorId);         // Start this elevator
-        bus.subscribe(Topic.STOP_ONE.code(), elevatorId);         // Stop this elevator
-        bus.subscribe(Topic.DISPATCH.code(), elevatorId);       // DISPATCH
-        bus.subscribe(Topic.POSITION.code(), elevatorId);       // POSITION
-        bus.subscribe(Topic.DOOR.code(), elevatorId);       // DOOR
-        bus.subscribe(Topic.DIRECTION.code(), elevatorId);       // DIRECTION
-        bus.subscribe(Topic.FLOOR.code(), elevatorId);       // FLOOR      // FLOOR
+        bus.subscribe(TopicCodes.SYSTEM_STOP.code(), 0);          // System Stop
+        bus.subscribe(TopicCodes.SYSTEM_START.code(), 0);          // System Start
+        bus.subscribe(TopicCodes.SYSTEM_RESET.code(), 0);          // System Reset
+        bus.subscribe(TopicCodes.CLEAR_FIRE.code(), 0);          // Clear Fire
+        bus.subscribe(TopicCodes.MODE.code(), 0);          // Mode
+        bus.subscribe(TopicCodes.START_ONE.code(), elevatorId);         // Start this elevator
+        bus.subscribe(TopicCodes.STOP_ONE.code(), elevatorId);         // Stop this elevator
+        bus.subscribe(TopicCodes.DISPATCH.code(), elevatorId);       // DISPATCH
+        bus.subscribe(TopicCodes.POSITION.code(), elevatorId);       // POSITION
+        bus.subscribe(TopicCodes.DOOR.code(), elevatorId);       // DOOR
+        bus.subscribe(TopicCodes.DIRECTION.code(), elevatorId);       // DIRECTION
+        bus.subscribe(TopicCodes.FLOOR.code(), elevatorId);       // FLOOR      // FLOOR
 
         //layout
         setAlignment(Pos.CENTER);
@@ -238,18 +237,18 @@ public class ElevatorPanel extends VBox {
     private void startBusListener() {
         Thread t = new Thread(() -> {
             while (true) {
-                poll(Topic.SYSTEM_STOP.code(), 0);          // System Stop
-                poll(Topic.SYSTEM_START.code(), 0);          // System Start
-                poll(Topic.SYSTEM_RESET.code(), 0);          // System Reset
-                poll(Topic.CLEAR_FIRE.code(), 0);          // Clear Fire
-                poll(Topic.MODE.code(), 0);          // Mode
-                poll(Topic.START_ONE.code(), elevatorId);        // Start this car
-                poll(Topic.STOP_ONE.code(), elevatorId);         // Stop this car
-                poll(Topic.DISPATCH.code(), elevatorId);
-                poll(Topic.POSITION.code(), elevatorId);
-                poll(Topic.DOOR.code(), elevatorId);
-                poll(Topic.DIRECTION.code(), elevatorId);
-                poll(Topic.FLOOR.code(), elevatorId);
+                poll(TopicCodes.SYSTEM_STOP.code(), 0);          // System Stop
+                poll(TopicCodes.SYSTEM_START.code(), 0);          // System Start
+                poll(TopicCodes.SYSTEM_RESET.code(), 0);          // System Reset
+                poll(TopicCodes.CLEAR_FIRE.code(), 0);          // Clear Fire
+                poll(TopicCodes.MODE.code(), 0);          // Mode
+                poll(TopicCodes.START_ONE.code(), elevatorId);        // Start this car
+                poll(TopicCodes.STOP_ONE.code(), elevatorId);         // Stop this car
+                poll(TopicCodes.DISPATCH.code(), elevatorId);
+                poll(TopicCodes.POSITION.code(), elevatorId);
+                poll(TopicCodes.DOOR.code(), elevatorId);
+                poll(TopicCodes.DIRECTION.code(), elevatorId);
+                poll(TopicCodes.FLOOR.code(), elevatorId);
 
                 try {
                     Thread.sleep(10);
@@ -266,7 +265,7 @@ public class ElevatorPanel extends VBox {
     }
 
     private void handleCommand(Message m) {
-        String t = Topic.fromCode(m.getTopic());
+        String t = TopicCodes.fromCode(m.getTopic());
         int st = m.getSubTopic();
         int body = m.getBody();
 
