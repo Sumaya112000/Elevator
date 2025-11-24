@@ -43,7 +43,7 @@ public class TestHarness {
                 int targetFloor = 1;
 
                 // Tell GUI: moving down
-                bus.publish(new Message(SoftwareBusCodes.displayDirection, carId, 1));
+                bus.publish(new Message(SoftwareBusCodes.cabinPosition, carId, 1));
 
                 while (currentFloor > targetFloor) {
                     currentFloor--;

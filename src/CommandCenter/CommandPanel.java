@@ -320,15 +320,6 @@ public class CommandPanel extends GridPane {
                 systemRunning = true;
                 updateButtonStates(true);
             });
-
-        } else if (t == SoftwareBusCodes.resetFloorSelection) {
-
-            Platform.runLater(() -> {
-                systemRunning = true;
-                systemMode = "CENTRALIZED";
-                updateForReset();
-            });
-
         } else if (t == SoftwareBusCodes.clearFire) {
 
             Platform.runLater(() -> {

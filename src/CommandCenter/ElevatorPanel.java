@@ -323,6 +323,7 @@ public class ElevatorPanel extends VBox {
             });
         } else if(t == SoftwareBusCodes.cabinPosition) {
             Platform.runLater(() -> updateElevatorPosition(body, true));
+            setDirection(Direction.IDLE);
         } else if(t == SoftwareBusCodes.doorStatus) {
             Platform.runLater(() -> setDoorStatus(body == 0));
         } else if(t == SoftwareBusCodes.displayDirection) {
@@ -365,6 +366,7 @@ public class ElevatorPanel extends VBox {
         } else {
             movingCar.setTranslateY(targetY);
         }
+        setDirection(Direction.IDLE);
     }
 
 
