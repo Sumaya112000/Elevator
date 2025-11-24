@@ -86,7 +86,7 @@ public class CommandPanel extends GridPane {
     public CommandPanel(SoftwareBus bus) {
         this.bus = bus;
         // LISTEN FOR MODE UPDATES FROM THE BUS
-        bus.subscribe(TopicCodes.MODE.code(), 0);
+        bus.subscribe(SoftwareBusCodes.elevatorMode, 0);
 
         // Layout grid
         setStyle("-fx-background-color: #333333;");
@@ -154,31 +154,31 @@ public class CommandPanel extends GridPane {
     //button handlers
     private void onStart() {
         systemRunning = true;
-        publishAll(TopicCodes.SYSTEM_START.code(), 0); // System Start
+        publishAll(SoftwareBusCodes.systemStart, 0); // System Start
         updateButtonStates(true);
     }
 
     private void onStop() {
         systemRunning = false;
-        publishAll(TopicCodes.SYSTEM_STOP.code(), 0); // System Stop
+        publishAll(SoftwareBusCodes.systemStop, 0); // System Stop
         updateButtonStates(false);
     }
 
     private void onReset() {
         systemRunning = true;
         systemMode = "CENTRALIZED";
-        publishAll(TopicCodes.SYSTEM_RESET.code(), 0); // System Reset
+        publishAll(SoftwareBusCodes.centralized, 0); // System Reset
         updateForReset();
     }
 
     private void onFirePressed() {
         if ("FIRE".equals(systemMode)) {
             systemMode = "CENTRALIZED";
-            publishAll(TopicCodes.CLEAR_FIRE.code(), 0);    // Clear Fire
+            publishAll(SoftwareBusCodes.clearFire, 0);    // Clear Fire
             updateForFireMode(false);
         } else {
             systemMode = "FIRE";
-            publishAll(TopicCodes.MODE.code(), B_MODE_TF); // Test Fire
+            publishAll(SoftwareBusCodes.fire, B_MODE_TF); // Test Fire
             updateForFireMode(true);
         }
     }
@@ -188,11 +188,11 @@ public class CommandPanel extends GridPane {
 
         if ("CENTRALIZED".equals(systemMode)) {
             systemMode = "INDEPENDENT";
-            publishAll(TopicCodes.MODE.code(), B_MODE_IND); // Mode: Independent
+            publishAll(SoftwareBusCodes.independent, B_MODE_IND); // Mode: Independent
             updateForAutoMode("INDEPENDENT");
         } else {
             systemMode = "CENTRALIZED";
-            publishAll(TopicCodes.MODE.code(), B_MODE_CEN); // Mode: Centralized
+            publishAll(SoftwareBusCodes.centralized, B_MODE_CEN); // Mode: Centralized
             updateForAutoMode("CENTRALIZED");
         }
     }
@@ -284,11 +284,10 @@ public class CommandPanel extends GridPane {
     private void startBusListener() {
         Thread t = new Thread(() -> {
             while (true) {
-                poll(TopicCodes.SYSTEM_STOP.code(), 0);   // System Stop
-                poll(TopicCodes.SYSTEM_START.code(), 0);   // System Start
-                poll(TopicCodes.SYSTEM_RESET.code(), 0);   // System Reset
-                poll(TopicCodes.CLEAR_FIRE.code(), 0);   // Clear Fire
-                poll(TopicCodes.MODE.code(), 0);   // Mode (1000/1100/1110)
+                poll(SoftwareBusCodes.systemStop, 0);   // System Stop
+                poll(SoftwareBusCodes.systemStart, 0);   // System Start
+                poll(SoftwareBusCodes.clearFire, 0);   // Clear Fire
+                poll(SoftwareBusCodes.setMode, 0);   // Mode (1000/1100/1110)
 
                 try {
                     Thread.sleep(10);
@@ -305,64 +304,61 @@ public class CommandPanel extends GridPane {
     }
 
     private void handleCommand(Message m) {
-        String t = TopicCodes.fromCode(m.getTopic());
+        int t = m.getTopic();
         int body = m.getBody();
 
-        switch (t) {
-            case "SYSTEM_STOP" -> // System Stop
-                    Platform.runLater(() -> {
-                        systemRunning = false;
-                        updateButtonStates(false);
-                    });
+        if (t == SoftwareBusCodes.systemStop) {
 
-            case "SYSTEM_START" -> // System Start
-                    Platform.runLater(() -> {
-                        systemRunning = true;
-                        updateButtonStates(true);
-                    });
+            Platform.runLater(() -> {
+                systemRunning = false;
+                updateButtonStates(false);
+            });
 
-            case "SYSTEM_RESET" -> // System Reset
-                    Platform.runLater(() -> {
-                        systemRunning = true;
-                        systemMode = "CENTRALIZED";
-                        updateForReset();
-                    });
+        } else if (t == SoftwareBusCodes.systemStart) {
 
-            case "CLEAR_FIRE" -> // Clear Fire
-                    Platform.runLater(() -> {
-                        systemMode = "CENTRALIZED";
-                        updateForFireMode(false);        // remove fire styling
-                        updateForAutoMode("CENTRALIZED"); // restore auto button border
-                        modeDisplay.setText("CENTRALIZED");
-                        modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
-                        updateButtonStates(true); // start/stop buttons re-enable
-                    });
+            Platform.runLater(() -> {
+                systemRunning = true;
+                updateButtonStates(true);
+            });
 
-            case "MODE" -> // Mode change body: 1000/1100/1110
-                    Platform.runLater(() -> {
-                        switch (body) {
-                            case B_MODE_CEN -> {                 // CENTRALIZED
-                                systemMode = "CENTRALIZED";
-                                updateForAutoMode("CENTRALIZED");
-                            }
+        } else if (t == SoftwareBusCodes.resetFloorSelection) {
 
-                            case B_MODE_IND -> {                // INDEPENDENT
-                                systemMode = "INDEPENDENT";
-                                updateForAutoMode("INDEPENDENT");
-                            }
+            Platform.runLater(() -> {
+                systemRunning = true;
+                systemMode = "CENTRALIZED";
+                updateForReset();
+            });
 
-                            case B_MODE_TF -> {                // TEST FIRE
-                                systemMode = "FIRE";
-                                updateForFireMode(true);
-                            }
+        } else if (t == SoftwareBusCodes.clearFire) {
 
-                            default -> System.out.println("CommandPanel: Unknown mode: " + body);
-                        }
-                    });
+            Platform.runLater(() -> {
+                systemMode = "CENTRALIZED";
+                updateForFireMode(false);
+                updateForAutoMode("CENTRALIZED");
+                modeDisplay.setText("CENTRALIZED");
+                modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
+                updateButtonStates(true);
+            });
 
-            default -> {
-                // Ignore unrelated topics
-            }
+        } else if (t == SoftwareBusCodes.mode) {
+
+            Platform.runLater(() -> {
+                if (body == SoftwareBusCodes.centralized) {
+                    systemMode = "CENTRALIZED";
+                    updateForAutoMode("CENTRALIZED");
+
+                } else if (body == SoftwareBusCodes.independent) {
+                    systemMode = "INDEPENDENT";
+                    updateForAutoMode("INDEPENDENT");
+
+                } else if (body == SoftwareBusCodes.fire) {
+                    systemMode = "FIRE";
+                    updateForFireMode(true);
+
+                } else {
+                    System.out.println("Unknown mode body: " + body);
+                }
+            });
         }
     }
 }

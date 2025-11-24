@@ -14,20 +14,20 @@ public class TestHarness {
         Thread.sleep(2000);
 
         System.out.println("START ALL");
-        bus.publish(new Message(TopicCodes.SYSTEM_START.code(), 0, 0));
+        bus.publish(new Message(SoftwareBusCodes.systemStart, 0, 0));
         Thread.sleep(1000);
 
         System.out.println("STOP E1");
-        bus.publish(new Message(TopicCodes.STOP_ONE.code(), 1, 0));
+        bus.publish(new Message(SoftwareBusCodes.stopElevator, 1, 0));
         Thread.sleep(2000);
 
         System.out.println("START E1");
-        bus.publish(new Message(TopicCodes.START_ONE.code(), 1, 0));
+        bus.publish(new Message(SoftwareBusCodes.startElevator, 1, 0));
         Thread.sleep(2000);
 
         // fire
         System.out.println("\n=== TEST FIRE MODE ===");
-        bus.publish(new Message(TopicCodes.MODE.code(), 0, 1110));  // enter FIRE
+        bus.publish(new Message(SoftwareBusCodes.setMode, 0, SoftwareBusCodes.fire));  // enter FIRE
         Thread.sleep(300);
 
         System.out.println("All elevators recalling to floor 1 … (simultaneous)");
@@ -43,20 +43,20 @@ public class TestHarness {
                 int targetFloor = 1;
 
                 // Tell GUI: moving down
-                bus.publish(new Message(TopicCodes.DIRECTION.code(), carId, 1));
+                bus.publish(new Message(SoftwareBusCodes.displayDirection, carId, 1));
 
                 while (currentFloor > targetFloor) {
                     currentFloor--;
 
-                    bus.publish(new Message(TopicCodes.POSITION.code(), carId, currentFloor)); // position
-                    bus.publish(new Message(TopicCodes.FLOOR.code(), carId, currentFloor)); // floor display
+                    bus.publish(new Message(SoftwareBusCodes.carDispatch, carId, currentFloor)); // position
+                    bus.publish(new Message(SoftwareBusCodes.displayFloor, carId, currentFloor)); // floor display
 
                     try { Thread.sleep(500); } catch (InterruptedException ignored) {}
                 }
 
                 // Arrived at floor 1
-                bus.publish(new Message(TopicCodes.DIRECTION.code(), carId, 2)); // idle
-                bus.publish(new Message(TopicCodes.DOOR.code(), carId, 0)); // open doors
+                bus.publish(new Message(SoftwareBusCodes.displayDirection, carId, 2)); // idle
+                bus.publish(new Message(SoftwareBusCodes.doorStatus, carId, 0)); // open doors
             });
 
             recallThreads[id-1].start();
@@ -69,14 +69,14 @@ public class TestHarness {
         Thread.sleep(3000);
 
         System.out.println("AUTO CLEAR FIRE");
-        bus.publish(new Message(TopicCodes.CLEAR_FIRE.code(), 0, 0)); // Clear Fire
+        bus.publish(new Message(SoftwareBusCodes.clearFire, 0, 0)); // Clear Fire
         Thread.sleep(400);
 
         // Close doors and refresh GUI
         for (int id = 1; id <= 4; id++) {
-            bus.publish(new Message(TopicCodes.DIRECTION.code(), id, 2));
-            bus.publish(new Message(TopicCodes.FLOOR.code(), id, 1));
-            bus.publish(new Message(TopicCodes.DOOR.code(), id, 1));
+            bus.publish(new Message(SoftwareBusCodes.displayDirection, id, 2));
+            bus.publish(new Message(SoftwareBusCodes.displayFloor, id, 1));
+            bus.publish(new Message(SoftwareBusCodes.doorStatus, id, 1));
             Thread.sleep(200);
         }
 
@@ -93,25 +93,25 @@ public class TestHarness {
                 int currentFloor = 5;  // or track if you want
                 int step = (targetFloor > currentFloor) ? 1 : -1;
 
-                bus.publish(new Message(TopicCodes.DIRECTION.code(), elevatorId,
+                bus.publish(new Message(SoftwareBusCodes.displayDirection, elevatorId,
                         step > 0 ? 0 : 1)); // up/down
 
                 while (currentFloor != targetFloor) {
                     currentFloor += step;
 
-                    bus.publish(new Message(TopicCodes.POSITION.code(), elevatorId, currentFloor));
-                    bus.publish(new Message(TopicCodes.FLOOR.code(), elevatorId, currentFloor));
+                    bus.publish(new Message(SoftwareBusCodes.cabinPosition, elevatorId, currentFloor));
+                    bus.publish(new Message(SoftwareBusCodes.displayFloor, elevatorId, currentFloor));
 
                     Thread.sleep(600);
                 }
 
-                bus.publish(new Message(TopicCodes.DIRECTION.code(), elevatorId, 2));
+                bus.publish(new Message(SoftwareBusCodes.displayDirection, elevatorId, 2));
 
                 // doors
-                bus.publish(new Message(TopicCodes.DOOR.code(), elevatorId, 0));
+                bus.publish(new Message(SoftwareBusCodes.doorStatus, elevatorId, 0));
                 Thread.sleep(2000);
 
-                bus.publish(new Message(TopicCodes.DOOR.code(), elevatorId, 1));
+                bus.publish(new Message(SoftwareBusCodes.doorStatus, elevatorId, 1));
                 Thread.sleep(1000);
             }
 

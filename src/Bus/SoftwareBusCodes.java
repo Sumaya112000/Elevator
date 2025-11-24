@@ -90,5 +90,4 @@ public class SoftwareBusCodes {
     public static int normal = 0;
     public static int overloaded = 1;
 
-
 }
