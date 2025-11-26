@@ -45,25 +45,19 @@ public class CommandPanel extends GridPane {
     private final Button startButton;
     private final Button stopButton;
 
-
     // Local UI state (purely visual)
     private boolean systemRunning = true;
     private String systemMode = "CENTRALIZED"; // CENTRALIZED | INDEPENDENT | FIRE
-
 
     // Styling
     private final String modeDisplayBaseStyle =
             "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px; " +
                     "-fx-alignment: center; -fx-background-radius: 14; -fx-padding: 6 10 6 10;";
 
-
     private final String buttonBaseStyle =
             "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px; " +
                     "-fx-background-radius: 14; -fx-padding: 6 10 6 10; " +
                     "-fx-border-radius: 14; -fx-border-width: 1; -fx-border-color: rgba(255,255,255,0.15);";
-
-
-
 
     private final String colorModeCentral = "-fx-background-color: #00695C;";
     private final String colorModeIndependent = "-fx-background-color: #424242;";
@@ -77,16 +71,21 @@ public class CommandPanel extends GridPane {
     private final String fireBtnGlowOn  = "-fx-effect: dropshadow(gaussian, rgba(255,193,7,0.7), 18, 0.4, 0, 0);";
     private final String fireBtnGlowOff = "-fx-effect: none;";
 
-
-
+    // Encoded mode bodies (match SoftwareBusCodes.centralized / independent / fire)
     private static final int B_MODE_CEN = 1000;
     private static final int B_MODE_IND = 1100;
     private static final int B_MODE_TF  = 1110;
 
     public CommandPanel(SoftwareBus bus) {
         this.bus = bus;
-        // LISTEN FOR MODE UPDATES FROM THE BUS
-        bus.subscribe(SoftwareBusCodes.elevatorMode, 0);
+
+        // OLD:
+        // bus.subscribe(SoftwareBusCodes.elevatorMode, 0);
+        // NEW: subscribe to the topics we actually poll (stop/start/clearFire/setMode)
+        bus.subscribe(SoftwareBusCodes.systemStop,  SoftwareBusCodes.allElevators);
+        bus.subscribe(SoftwareBusCodes.systemStart, SoftwareBusCodes.allElevators);
+        bus.subscribe(SoftwareBusCodes.clearFire,   SoftwareBusCodes.allElevators);
+        bus.subscribe(SoftwareBusCodes.setMode,     SoftwareBusCodes.allElevators);
 
         // Layout grid
         setStyle("-fx-background-color: #333333;");
@@ -110,27 +109,19 @@ public class CommandPanel extends GridPane {
         modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
         add(modeDisplay, 0, 2, 1, 2);
 
-
-
         // Buttons  publish messages
         fireControlButton = createButton("TEST FIRE", Color.web("#C62828"), 70,
                 e -> onFirePressed());
         add(fireControlButton, 0, 4, 1, 2);
-
-
 
         autoButton = createButton("AUTO", Color.web("#283593"), 70,
                 e -> onAutoPressed());
         autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOn);
         add(autoButton, 0, 6, 1, 2);
 
-
-
         startButton = createButton("START", Color.web("#2E7D32"), 70,
                 e -> onStart());
         add(startButton, 0, 8, 1, 2);
-
-
 
         stopButton = createButton("STOP", Color.web("#B71C1C"), 70,
                 e -> onStop());
@@ -167,18 +158,31 @@ public class CommandPanel extends GridPane {
     private void onReset() {
         systemRunning = true;
         systemMode = "CENTRALIZED";
-        publishAll(SoftwareBusCodes.centralized, 0); // System Reset
+        // OLD: weird message, leaving it unused for now:
+        // publishAll(SoftwareBusCodes.centralized, 0); // System Reset
         updateForReset();
     }
 
     private void onFirePressed() {
+        // OLD:
+        // if ("FIRE".equals(systemMode)) {
+        //     systemMode = "CENTRALIZED";
+        //     publishAll(SoftwareBusCodes.clearFire, 0);    // Clear Fire
+        //     updateForFireMode(false);
+        // } else {
+        //     systemMode = "FIRE";
+        //     publishAll(SoftwareBusCodes.fire, B_MODE_TF); // Test Fire
+        //     updateForFireMode(true);
+        // }
+
+        // NEW:
         if ("FIRE".equals(systemMode)) {
             systemMode = "CENTRALIZED";
-            publishAll(SoftwareBusCodes.clearFire, 0);    // Clear Fire
+            publishAll(SoftwareBusCodes.clearFire, 0);          // Clear Fire
             updateForFireMode(false);
         } else {
             systemMode = "FIRE";
-            publishAll(SoftwareBusCodes.fire, B_MODE_TF); // Test Fire
+            publishAll(SoftwareBusCodes.setMode, SoftwareBusCodes.fire);  // enter FIRE mode
             updateForFireMode(true);
         }
     }
@@ -186,13 +190,25 @@ public class CommandPanel extends GridPane {
     private void onAutoPressed() {
         if ("FIRE".equals(systemMode)) return; // ignore during FIRE
 
+        // OLD:
+        // if ("CENTRALIZED".equals(systemMode)) {
+        //     systemMode = "INDEPENDENT";
+        //     publishAll(SoftwareBusCodes.independent, B_MODE_IND); // Mode: Independent
+        //     updateForAutoMode("INDEPENDENT");
+        // } else {
+        //     systemMode = "CENTRALIZED";
+        //     publishAll(SoftwareBusCodes.centralized, B_MODE_CEN); // Mode: Centralized
+        //     updateForAutoMode("CENTRALIZED");
+        // }
+
+        // NEW: use setMode topic plus body centralized/independent
         if ("CENTRALIZED".equals(systemMode)) {
             systemMode = "INDEPENDENT";
-            publishAll(SoftwareBusCodes.independent, B_MODE_IND); // Mode: Independent
+            publishAll(SoftwareBusCodes.setMode, SoftwareBusCodes.independent);
             updateForAutoMode("INDEPENDENT");
         } else {
             systemMode = "CENTRALIZED";
-            publishAll(SoftwareBusCodes.centralized, B_MODE_CEN); // Mode: Centralized
+            publishAll(SoftwareBusCodes.setMode, SoftwareBusCodes.centralized);
             updateForAutoMode("CENTRALIZED");
         }
     }
@@ -215,13 +231,11 @@ public class CommandPanel extends GridPane {
         return button;
     }
 
-
     private RowConstraints rc(double h) {
         RowConstraints rc = new RowConstraints(h);
         rc.setValignment(VPos.CENTER);
         return rc;
     }
-
 
     public void updateButtonStates(boolean isRunning) {
         startButton.setDisable(isRunning);
@@ -237,7 +251,6 @@ public class CommandPanel extends GridPane {
         autoButton.setStyle(autoButton.getStyle() + keepOpacity);
     }
 
-
     public void updateForReset() {
         modeDisplay.setText("CENTRALIZED");
         modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
@@ -246,7 +259,6 @@ public class CommandPanel extends GridPane {
         autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOn + " -fx-opacity: 1.0;");
         updateButtonStates(true);
     }
-
 
     public void updateForFireMode(boolean isFire) {
         if (isFire) {
@@ -263,7 +275,6 @@ public class CommandPanel extends GridPane {
         }
     }
 
-
     public void updateForAutoMode(String mode) {
         if ("CENTRALIZED".equals(mode)) {
             modeDisplay.setText("CENTRALIZED");
@@ -274,7 +285,6 @@ public class CommandPanel extends GridPane {
             modeDisplay.setStyle(modeDisplayBaseStyle + colorModeIndependent);
             autoButton.setStyle(colorAuto + " " + buttonBaseStyle + " " + autoBorderOff + " -fx-opacity: 1.0;");
         }
-
     }
 
     /**
@@ -285,9 +295,9 @@ public class CommandPanel extends GridPane {
         Thread t = new Thread(() -> {
             while (true) {
                 poll(SoftwareBusCodes.systemStop, 0);   // System Stop
-                poll(SoftwareBusCodes.systemStart, 0);   // System Start
-                poll(SoftwareBusCodes.clearFire, 0);   // Clear Fire
-                poll(SoftwareBusCodes.setMode, 0);   // Mode (1000/1100/1110)
+                poll(SoftwareBusCodes.systemStart, 0);  // System Start
+                poll(SoftwareBusCodes.clearFire, 0);    // Clear Fire
+                poll(SoftwareBusCodes.setMode, 0);      // Mode (1000/1100/1110)
 
                 try {
                     Thread.sleep(10);
@@ -320,6 +330,7 @@ public class CommandPanel extends GridPane {
                 systemRunning = true;
                 updateButtonStates(true);
             });
+
         } else if (t == SoftwareBusCodes.clearFire) {
 
             Platform.runLater(() -> {
@@ -331,7 +342,10 @@ public class CommandPanel extends GridPane {
                 updateButtonStates(true);
             });
 
-        } else if (t == SoftwareBusCodes.mode) {
+            // OLD:
+            // } else if (t == SoftwareBusCodes.mode) {
+            // NEW:
+        } else if (t == SoftwareBusCodes.setMode) {
 
             Platform.runLater(() -> {
                 if (body == SoftwareBusCodes.centralized) {

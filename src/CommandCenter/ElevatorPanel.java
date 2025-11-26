@@ -35,12 +35,9 @@ public class ElevatorPanel extends VBox {
     private boolean autoMode = false;     // true = INDEPENDENT (AUTO)
     private boolean isFireMode = false;   // true = in FIRE recall
 
-
     // BUS client
     private final SoftwareBus bus;
     private final int elevatorId;
-
-
 
     // ui widgets
     private Button mainControlButton;
@@ -65,7 +62,6 @@ public class ElevatorPanel extends VBox {
     private static final double TOTAL_FLOOR_HEIGHT = FLOOR_HEIGHT + FLOOR_SPACING;
     private static final double ANIMATION_SPEED_PER_FLOOR = 400.0; // ms per floor
 
-
     // ui components
     private class DualDotIndicatorPanel extends VBox {
         private final Circle upDot = new Circle(3, Color.web("#505050"));
@@ -84,8 +80,6 @@ public class ElevatorPanel extends VBox {
             if (direction == Direction.DOWN) downDot.setFill(color);
         }
     }
-
-
 
     private class DirectionIndicatorPanel extends VBox {
         private final Polygon upTriangle, downTriangle;
@@ -107,8 +101,6 @@ public class ElevatorPanel extends VBox {
         }
     }
 
-
-
     public ElevatorPanel(int id) {
         super(3);
         this.elevatorId = id;
@@ -116,15 +108,15 @@ public class ElevatorPanel extends VBox {
 
         // Subscribe to all topics relevant for this car
         bus.subscribe(SoftwareBusCodes.systemStop, 0);          // System Stop
-        bus.subscribe(SoftwareBusCodes.systemStart, 0);          // System Start
-        bus.subscribe(SoftwareBusCodes.clearFire, 0);          // Clear Fire
-        bus.subscribe(SoftwareBusCodes.setMode, 0);          // Mode
+        bus.subscribe(SoftwareBusCodes.systemStart, 0);         // System Start
+        bus.subscribe(SoftwareBusCodes.clearFire, 0);           // Clear Fire
+        bus.subscribe(SoftwareBusCodes.setMode, 0);             // Mode
         bus.subscribe(SoftwareBusCodes.startElevator, elevatorId);         // Start this elevator
-        bus.subscribe(SoftwareBusCodes.stopElevator, elevatorId);         // Stop this elevator
-        bus.subscribe(SoftwareBusCodes.carDispatch, elevatorId);       // DISPATCH
-        bus.subscribe(SoftwareBusCodes.cabinPosition, elevatorId);       // POSITION
-        bus.subscribe(SoftwareBusCodes.doorStatus, elevatorId);       // DOOR
-        bus.subscribe(SoftwareBusCodes.displayDirection, elevatorId);       // DIRECTION
+        bus.subscribe(SoftwareBusCodes.stopElevator, elevatorId);          // Stop this elevator
+        bus.subscribe(SoftwareBusCodes.carDispatch, elevatorId);           // DISPATCH
+        bus.subscribe(SoftwareBusCodes.cabinPosition, elevatorId);         // POSITION
+        bus.subscribe(SoftwareBusCodes.doorStatus, elevatorId);            // DOOR
+        bus.subscribe(SoftwareBusCodes.displayDirection, elevatorId);      // DIRECTION
         bus.subscribe(SoftwareBusCodes.displayFloor, elevatorId);          // FLOOR
 
         //layout
@@ -190,8 +182,6 @@ public class ElevatorPanel extends VBox {
         startBusListener();
     }
 
-
-
     private HBox createFloorRow(int floor) {
         HBox row = new HBox(5);
         row.setAlignment(Pos.CENTER);
@@ -209,14 +199,10 @@ public class ElevatorPanel extends VBox {
         return row;
     }
 
-
-
     private void toggleEnabledState() {
         isEnabled = !isEnabled;
         applyEnabledUI();
     }
-
-
 
     private void applyEnabledUI() {
         if (isEnabled) {
@@ -230,16 +216,14 @@ public class ElevatorPanel extends VBox {
         }
     }
 
-
-
     // BUS listener
     private void startBusListener() {
         Thread t = new Thread(() -> {
             while (true) {
                 poll(SoftwareBusCodes.systemStop, 0);          // System Stop
-                poll(SoftwareBusCodes.systemStart, 0);          // System Start
-                poll(SoftwareBusCodes.clearFire, 0);          // Clear Fire
-                poll(SoftwareBusCodes.setMode, 0);          // Mode
+                poll(SoftwareBusCodes.systemStart, 0);         // System Start
+                poll(SoftwareBusCodes.clearFire, 0);           // Clear Fire
+                poll(SoftwareBusCodes.setMode, 0);             // Mode
                 poll(SoftwareBusCodes.startElevator, elevatorId);        // Start this car
                 poll(SoftwareBusCodes.stopElevator, elevatorId);         // Stop this car
                 poll(SoftwareBusCodes.carDispatch, elevatorId);
@@ -277,9 +261,16 @@ public class ElevatorPanel extends VBox {
                 applyEnabledUI();
             });
         } else if(t == SoftwareBusCodes.clearFire) {
+            // OLD:
+            // Platform.runLater(() -> {
+            //     isFireMode = false;
+            //     closeDoor();
+            // });
+            // NEW: also clear all call indicators when fire is cleared
             Platform.runLater(() -> {
                 isFireMode = false;
                 closeDoor();
+                clearAllCallIndicators();
             });
         } else if(t == SoftwareBusCodes.setMode) {
             Platform.runLater(() -> {
@@ -325,7 +316,20 @@ public class ElevatorPanel extends VBox {
             Platform.runLater(() -> updateElevatorPosition(body, true));
             setDirection(Direction.IDLE);
         } else if(t == SoftwareBusCodes.doorStatus) {
-            Platform.runLater(() -> setDoorStatus(body == 0));
+            // OLD:
+            // Platform.runLater(() -> setDoorStatus(body == 0));
+            // NEW: treat body==doorOpen and clear that floor's indicators
+            Platform.runLater(() -> {
+                boolean open = (body == SoftwareBusCodes.doorOpen);
+                setDoorStatus(open);
+                if (open) {
+                    DualDotIndicatorPanel indicator = floorCallIndicators.get(currentFloor);
+                    if (indicator != null) {
+                        indicator.setDotLit(Direction.UP, false);
+                        indicator.setDotLit(Direction.DOWN, false);
+                    }
+                }
+            });
         } else if(t == SoftwareBusCodes.displayDirection) {
             Platform.runLater(() -> {
                 switch (body) {
@@ -344,8 +348,6 @@ public class ElevatorPanel extends VBox {
             System.out.println("Unknown topic");
         }
     }
-
-
 
     // Movement display helper (animation only when POSITION messages arrive)
     private void updateElevatorPosition(int newFloor, boolean animate) {
@@ -369,7 +371,6 @@ public class ElevatorPanel extends VBox {
         setDirection(Direction.IDLE);
     }
 
-
     private void setDoorStatus(boolean open) {
         this.isDoorOpen = open;
         String borderColor = open ? "white" : "black";
@@ -378,17 +379,22 @@ public class ElevatorPanel extends VBox {
                         + borderColor + ";-fx-border-width: 0 2 0 2;");
     }
 
-
     private void closeDoor() {
         setDoorStatus(false);
     }
-
 
     private void setDirection(Direction d) {
         this.currentDirection = d;
         directionIndicator.setDirection(d);
     }
 
+    // NEW: helper to clear all call indicators (used on CLEAR FIRE)
+    private void clearAllCallIndicators() {
+        for (DualDotIndicatorPanel ind : floorCallIndicators.values()) {
+            ind.setDotLit(Direction.UP, false);
+            ind.setDotLit(Direction.DOWN, false);
+        }
+    }
 
     // Getters
     public int getCurrentFloor()   { return currentFloor; }
@@ -397,4 +403,3 @@ public class ElevatorPanel extends VBox {
     public boolean isFireMode()    { return isFireMode; }
     public boolean isEnabled()     { return isEnabled; }
 }
-
