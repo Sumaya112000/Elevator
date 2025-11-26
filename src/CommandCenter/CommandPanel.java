@@ -340,6 +340,7 @@ public class CommandPanel extends GridPane {
                 modeDisplay.setText("CENTRALIZED");
                 modeDisplay.setStyle(modeDisplayBaseStyle + colorModeCentral);
                 updateButtonStates(true);
+                System.out.println("Fire cleared system returning to CENTRALIZED mode");
             });
 
             // OLD:

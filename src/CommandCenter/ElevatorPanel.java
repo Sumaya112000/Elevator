@@ -118,6 +118,7 @@ public class ElevatorPanel extends VBox {
         bus.subscribe(SoftwareBusCodes.doorStatus, elevatorId);            // DOOR
         bus.subscribe(SoftwareBusCodes.displayDirection, elevatorId);      // DIRECTION
         bus.subscribe(SoftwareBusCodes.displayFloor, elevatorId);          // FLOOR
+        bus.subscribe(SoftwareBusCodes.hallCall, elevatorId);              // HALL CALLS - ADDED
 
         //layout
         setAlignment(Pos.CENTER);
@@ -231,6 +232,7 @@ public class ElevatorPanel extends VBox {
                 poll(SoftwareBusCodes.doorStatus, elevatorId);
                 poll(SoftwareBusCodes.displayDirection, elevatorId);
                 poll(SoftwareBusCodes.displayFloor, elevatorId);
+                poll(SoftwareBusCodes.hallCall, elevatorId);             // HALL CALLS - ADDED
 
                 try {
                     Thread.sleep(10);
@@ -250,38 +252,46 @@ public class ElevatorPanel extends VBox {
         int t = m.getTopic();
         int st = m.getSubTopic();
         int body = m.getBody();
+
         if (t == SoftwareBusCodes.systemStop) {// System Stop (all)
             Platform.runLater(() -> {
                 isEnabled = false;
                 applyEnabledUI();
+                logState("System Stop");
             });
         } else if(t == SoftwareBusCodes.systemStart) { // System Start (all)
             Platform.runLater(() -> {
                 isEnabled = true;
                 applyEnabledUI();
+                logState("System Start");
             });
         } else if(t == SoftwareBusCodes.clearFire) {
-            // OLD:
-            // Platform.runLater(() -> {
-            //     isFireMode = false;
-            //     closeDoor();
-            // });
-            // NEW: also clear all call indicators when fire is cleared
             Platform.runLater(() -> {
                 isFireMode = false;
                 closeDoor();
                 clearAllCallIndicators();
+                logState("Fire Cleared");
+                System.out.println("Elevator " + elevatorId + " fire cleared - ready for normal operation");
             });
         } else if(t == SoftwareBusCodes.setMode) {
             Platform.runLater(() -> {
                 if (body == SoftwareBusCodes.centralized) {          // Centralized
                     autoMode = false;
                     isFireMode = false;
+                    logState("Mode: Centralized");
+                    System.out.println("Elevator " + elevatorId + " switched to CENTRALIZED mode");
                 } else if (body == SoftwareBusCodes.independent) {    // Independent
                     autoMode = true;
                     isFireMode = false;
+                    logState("Mode: Independent");
+                    System.out.println("Elevator " + elevatorId + " switched to INDEPENDENT mode");
                 } else if (body == SoftwareBusCodes.fire) {   // Test Fire
                     isFireMode = true;
+                    autoMode = false;
+                    // In fire mode, clear all call indicators since elevators recall to floor 1
+                    clearAllCallIndicators();
+                    logState("Mode: Fire");
+                    System.out.println("Elevator " + elevatorId + " entered FIRE mode - clearing all calls");
                 }
             });
         } else if(t == SoftwareBusCodes.startElevator) {
@@ -289,6 +299,7 @@ public class ElevatorPanel extends VBox {
                 Platform.runLater(() -> {
                     isEnabled = true;
                     applyEnabledUI();
+                    logState("Elevator Start");
                 });
             }
         } else if(t == SoftwareBusCodes.stopElevator) {
@@ -296,6 +307,7 @@ public class ElevatorPanel extends VBox {
                 Platform.runLater(() -> {
                     isEnabled = false;
                     applyEnabledUI();
+                    logState("Elevator Stop");
                 });
             }
         } else if(t == SoftwareBusCodes.carDispatch) {
@@ -311,14 +323,12 @@ public class ElevatorPanel extends VBox {
                     if (d == Direction.UP)  indicator.setDotLit(Direction.UP, true);
                     if (d == Direction.DOWN) indicator.setDotLit(Direction.DOWN, true);
                 }
+                logState("Car Dispatch to floor " + assignedFloor);
             });
         } else if(t == SoftwareBusCodes.cabinPosition) {
             Platform.runLater(() -> updateElevatorPosition(body, true));
             setDirection(Direction.IDLE);
         } else if(t == SoftwareBusCodes.doorStatus) {
-            // OLD:
-            // Platform.runLater(() -> setDoorStatus(body == 0));
-            // NEW: treat body==doorOpen and clear that floor's indicators
             Platform.runLater(() -> {
                 boolean open = (body == SoftwareBusCodes.doorOpen);
                 setDoorStatus(open);
@@ -327,8 +337,10 @@ public class ElevatorPanel extends VBox {
                     if (indicator != null) {
                         indicator.setDotLit(Direction.UP, false);
                         indicator.setDotLit(Direction.DOWN, false);
+                        System.out.println("Elevator " + elevatorId + " doors opened at floor " + currentFloor + " - clearing indicators");
                     }
                 }
+                logState("Door " + (open ? "Open" : "Closed"));
             });
         } else if(t == SoftwareBusCodes.displayDirection) {
             Platform.runLater(() -> {
@@ -343,6 +355,24 @@ public class ElevatorPanel extends VBox {
                 currentFloor = body;
                 currentFloorDisplay.setText("" + body);
                 carFloorLabel.setText("" + body);
+            });
+        } else if(t == SoftwareBusCodes.hallCall) { // HALL CALL HANDLING - ADDED
+            Platform.runLater(() -> {
+                logState("HallCall received");
+                int calledFloor = body;
+                // Only process hall calls if not in fire mode and elevator is enabled
+                if (!isFireMode && isEnabled) {
+                    Direction callDirection = (calledFloor > currentFloor) ? Direction.UP : Direction.DOWN;
+
+                    DualDotIndicatorPanel indicator = floorCallIndicators.get(calledFloor);
+                    if (indicator != null) {
+                        indicator.setDotLit(callDirection, true);
+                        System.out.println("Elevator " + elevatorId + " hall call: floor " + calledFloor +
+                                " direction " + callDirection + " - indicator LIT");
+                    }
+                } else {
+                    System.out.println("Elevator " + elevatorId + " hall call IGNORED - FireMode: " + isFireMode + ", Enabled: " + isEnabled);
+                }
             });
         } else {
             System.out.println("Unknown topic");
@@ -388,12 +418,25 @@ public class ElevatorPanel extends VBox {
         directionIndicator.setDirection(d);
     }
 
-    // NEW: helper to clear all call indicators (used on CLEAR FIRE)
+    // Helper to clear all call indicators (used on CLEAR FIRE)
     private void clearAllCallIndicators() {
-        for (DualDotIndicatorPanel ind : floorCallIndicators.values()) {
-            ind.setDotLit(Direction.UP, false);
-            ind.setDotLit(Direction.DOWN, false);
+        for (int floor = 1; floor <= 10; floor++) {
+            DualDotIndicatorPanel indicator = floorCallIndicators.get(floor);
+            if (indicator != null) {
+                indicator.setDotLit(Direction.UP, false);
+                indicator.setDotLit(Direction.DOWN, false);
+            }
         }
+        System.out.println("Elevator " + elevatorId + " - ALL call indicators cleared");
+    }
+
+    // Debug helper method
+    private void logState(String action) {
+        System.out.println("Elevator " + elevatorId + " [" + action +
+                "] - Floor: " + currentFloor +
+                ", Enabled: " + isEnabled +
+                ", FireMode: " + isFireMode +
+                ", AutoMode: " + autoMode);
     }
 
     // Getters
