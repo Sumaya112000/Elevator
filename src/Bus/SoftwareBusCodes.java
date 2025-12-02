@@ -13,11 +13,16 @@ public class SoftwareBusCodes {
 
     public static int doorControl = 100;
     public static int carDispatch = 102;
-    public static int setMode = 103;
     public static int resetFloorSelection = 109;
     public static int resetCall = 110;
     public static int displayFloor = 111;
     public static int displayDirection = 112;
+    public static final int callsEnable = 113;
+    public static final int selectionsEnable = 114;
+    public static final int selectionsType = 115;
+    public static final int playSound = 116;
+
+    public static final int carStop = 117;
 
     public static int fireAlarm = 120;
 
@@ -29,13 +34,17 @@ public class SoftwareBusCodes {
     public static int doorStatus = 204;
     public static int cabinLoad = 205;
     public static int fireKey = 206;
+    public static final int currDirection = 207;
+    public static final int currMovement = 208;
+    public static final int fireAlarmActive = 209;
+    public static final int topSensor = 210;
+    public static final int bottomSensor = 211;
+
 
     //Control devices
-    public static int buttons = 300;
-    public static int cabin = 301;
-    public static int doorAssembly = 302;
-    public static int mode = 303;
-    public static int notifier = 304;
+    public static final int setMode = 300;
+    public static final int setDestination = 301;
+    public static final int elevatorState = 303; // if on or off
 
 
     //List of Subtopics
@@ -89,5 +98,6 @@ public class SoftwareBusCodes {
 
     public static int normal = 0;
     public static int overloaded = 1;
+
 
 }
