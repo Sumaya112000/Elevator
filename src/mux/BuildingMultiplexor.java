@@ -1,5 +1,34 @@
 package mux;
 
+/**
+ * HALL CALL ENCODING CONVENTION:
+ * ================================
+ * This encoding is used consistently across the entire system.
+ *
+ * UP calls:   body = floor + 100
+ *   Examples:
+ *     - Floor 1 UP  → body = 101
+ *     - Floor 5 UP  → body = 105
+ *     - Floor 9 UP  → body = 109
+ *
+ * DOWN calls: body = floor
+ *   Examples:
+ *     - Floor 2 DOWN → body = 2
+ *     - Floor 7 DOWN → body = 7
+ *     - Floor 10 DOWN → body = 10
+ *
+ * Decoding (in receivers like ElevatorPanel, SystemController):
+ *   if (body > 100) {
+ *       floor = body - 100;
+ *       direction = UP;
+ *   } else {
+ *       floor = body;
+ *       direction = DOWN;
+ *   }
+ *
+ * This encoding is already implemented correctly in pollCallButtons() below.
+ */
+
 import Bus.*;
 import Message.*;
 import javafx.application.Platform;

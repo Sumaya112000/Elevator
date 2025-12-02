@@ -28,7 +28,7 @@ public class ElevatorPanel extends VBox {
 
     // state flags
     // Start visually at floor 10 (top) for testing demo
-    private int currentFloor = 10;
+    private int currentFloor = 1;
     private Direction currentDirection = Direction.IDLE;
     private boolean isDoorOpen = false;
     private boolean isEnabled = true;     // true = running
@@ -356,14 +356,26 @@ public class ElevatorPanel extends VBox {
                 currentFloorDisplay.setText("" + body);
                 carFloorLabel.setText("" + body);
             });
-        } else if(t == SoftwareBusCodes.hallCall) { // HALL CALL HANDLING - ADDED
+        } else if(t == SoftwareBusCodes.hallCall) { // HALL CALL HANDLING - FIXED ENCODING
+            final int hallBody = body;
             Platform.runLater(() -> {
-                logState("HallCall received");
-                int calledFloor = body;
-                // Only process hall calls if not in fire mode and elevator is enabled
-                if (!isFireMode && isEnabled) {
-                    Direction callDirection = (calledFloor > currentFloor) ? Direction.UP : Direction.DOWN;
 
+                int calledFloor;
+                Direction callDirection;
+
+                // DECODE: body > 100 means UP, otherwise DOWN
+                if (hallBody > 100) {
+                    calledFloor = hallBody - 100;
+                    callDirection = Direction.UP;
+                } else {
+                    calledFloor = hallBody;
+                    callDirection = Direction.DOWN;
+                }
+
+                logState("HallCall received: floor " + calledFloor + " " + callDirection);
+
+                // Only process hall calls if not in fire mode and elevator is enabled
+                if (!isFireMode && isEnabled && calledFloor >= 1 && calledFloor <= 10) {
                     DualDotIndicatorPanel indicator = floorCallIndicators.get(calledFloor);
                     if (indicator != null) {
                         indicator.setDotLit(callDirection, true);
@@ -371,7 +383,8 @@ public class ElevatorPanel extends VBox {
                                 " direction " + callDirection + " - indicator LIT");
                     }
                 } else {
-                    System.out.println("Elevator " + elevatorId + " hall call IGNORED - FireMode: " + isFireMode + ", Enabled: " + isEnabled);
+                    System.out.println("Elevator " + elevatorId + " hall call IGNORED - FireMode: " +
+                            isFireMode + ", Enabled: " + isEnabled);
                 }
             });
         } else {
