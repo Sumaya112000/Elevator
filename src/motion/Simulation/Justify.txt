@@ -1,0 +1,10 @@
+# Motion simulation
+
+Motion simulation is our solution to not having actual hardware. It informs the
+sensors on if they should be triggered or not, moves the elevator in
+accordance to the constants defined in Util.Constants.
+Motion simulation does not talk to the api directly, but instead
+talks to the *actual hardware.
+
+*The 'actual hardware' is a mockup of the hardware, which decisions are being informed
+by motion simulator, see Hardware, and Simulation.MotionSimulation.

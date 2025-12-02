@@ -1,0 +1,16 @@
+# Util
+These are the util objects used throughout our program
+
+## Constants
+This is the constants for computing the motor movement, accleration,
+velocity, max speed,ect
+
+## Direction
+Enum that defines the state for the elevators direction. Up, down and
+null(as in no direction choosen)
+
+## Observable
+An iterface that allows objects to observer other objects
+
+## Observer
+An interface that allows objects to observe other objects
