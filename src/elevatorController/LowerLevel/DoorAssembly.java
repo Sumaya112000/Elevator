@@ -1,6 +1,6 @@
 package elevatorController.LowerLevel;
 
-import bus.Bus.SoftwareBus;
+import Bus.*;
 
 /**
  * The door assembly is a virtualization of the physical interfaces which

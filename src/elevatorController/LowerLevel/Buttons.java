@@ -1,6 +1,6 @@
 package elevatorController.LowerLevel;
 
-import bus.Bus.SoftwareBus;
+import Bus.*;
 import elevatorController.Util.FloorNDirection;
 
 import java.util.ArrayList;
