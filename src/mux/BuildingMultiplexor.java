@@ -1,6 +1,7 @@
 package mux;
 
 import Bus.*;
+import Message.*;
 import javafx.application.Platform;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
