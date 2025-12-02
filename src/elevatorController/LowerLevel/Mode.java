@@ -1,65 +1,51 @@
 package elevatorController.LowerLevel;
 
 import Bus.*;
+import Message.*;
 import elevatorController.Util.FloorNDirection;
 import elevatorController.Util.State;
 
-/**
- * The mode serves as a means for the Elevator Controller to be put into and track its current mode.
- * The mode is indirectly being updated by the Control Room, a separate entity outside of the Elevator Controller system.
- * Additionally, the mode is responsible for taking in demands from the Control Room when the elevator is being remotely controlled.
- * The mode object receives messages via the software bus but does not post messages to the software bus.
- *
- * The modes:
- *         1 – NORMAL
- *         2 – FIRE_SAFETY
- *         3 - CONTROLLED
- */
 public class Mode {
     private int elevatorID;
     private SoftwareBus softwareBus;
     private State currentMode;
     private FloorNDirection currDestination;
 
-    /**
-     * Instantiate a Mode object
-     * @param elevatorID which elevator this Mode object is associated with
-     *                   (for software bus messages)
-     * @param softwareBus the means of communication
-     */
     public Mode(int elevatorID, SoftwareBus softwareBus) {
-        //TODO call subscribe on softwareBus w/ relevant topic/subtopic
         this.softwareBus = softwareBus;
         this.elevatorID = elevatorID;
-
         this.currDestination = null;
-
-        // Initially in Normal mode
         this.currentMode = State.NORMAL;
+
+        softwareBus.subscribe(SoftwareBusCodes.setMode, 0);
+
+        System.out.println("Mode " + elevatorID + " initialized in NORMAL mode");
     }
 
-    /**
-     * Call get() on softwareBus w/ appropriate topic/subtopic, until NULL is returned (only care about most recent mode
-     * set), store last valid mode in currentMode, return currentMode
-     * @return the currentMode this elevator is in
-     */
     public State getMode(){
         setCurrentMode();
         return currentMode;
     }
 
-    /**
-     * Pulls all related messages from softwareBUs until null and
-     * sets current mode equal to the last relevant message
-     */
     private void setCurrentMode(){
-        //Todo: Set current mode from software bus
+        Message modeMsg;
+        while ((modeMsg = softwareBus.get(SoftwareBusCodes.setMode, 0)) != null) {
+            int body = modeMsg.getBody();
+            if (body == SoftwareBusCodes.centralized || body == SoftwareBusCodes.independent) {
+                currentMode = State.NORMAL;
+                System.out.println("Elevator " + elevatorID + " mode changed to NORMAL");
+            } else if (body == SoftwareBusCodes.fire) {
+                currentMode = State.FIRE;
+                System.out.println("Elevator " + elevatorID + " mode changed to FIRE");
+            }
+        }
     }
 
-    /**
-     * Call get() on softwareBus w/ appropriate topic/subtopic,
-     * @return
-     */
-    public FloorNDirection nextService(){return null;}
-
+    public FloorNDirection nextService(){
+        Message dispatchMsg = softwareBus.get(SoftwareBusCodes.carDispatch, elevatorID);
+        if (dispatchMsg != null) {
+            int body = dispatchMsg.getBody();
+        }
+        return null;
+    }
 }

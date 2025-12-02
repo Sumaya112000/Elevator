@@ -1,96 +1,101 @@
 package elevatorController.LowerLevel;
 
 import Bus.*;
+import Message.*;
 import elevatorController.Util.Direction;
 import elevatorController.Util.FloorNDirection;
 
-/**
- * The cabin provides a means for the elevator controller to send the elevator to a destination.
- * The cabin indirectly controls the motor by sending messages to the Software Bus.
- * Additionally, the cabin indirectly receives messages from physical sensors through the Software Bus.
- */
 public class Cabin implements Runnable {
-    private int currDest;
-    private Direction currDirection;
-    private int currFloor;
+    private int elevatorID;
+    private volatile int currDest;
+    private volatile Direction currDirection;
+    private volatile int currFloor;
     private int topAlign;
     private int botAlign;
-    private boolean motor;
+    private volatile boolean motor;
     private SoftwareBus softwareBus;
 
     public Cabin(int elevatorID, SoftwareBus softwareBus){
-        //TODO may need to take in int for elevator number for software bus subscription
-        //TODO call subscribe on softwareBus w/ relevant topic/subtopic
-
+        this.elevatorID = elevatorID;
         this.softwareBus = softwareBus;
-        this.currDest = 0;
+        this.currDest = 1;
+        this.currFloor = 1;
         this.currDirection = Direction.STOPPED;
+        this.motor = false;
 
-        //Start Cabin Thread
+        softwareBus.subscribe(SoftwareBusCodes.cabinPosition, elevatorID);
+        softwareBus.subscribe(SoftwareBusCodes.currDirection, elevatorID);
+        softwareBus.subscribe(SoftwareBusCodes.currMovement, elevatorID);
+
         Thread thread = new Thread(this);
+        thread.setDaemon(true);
         thread.start();
+
+        System.out.println("Cabin " + elevatorID + " thread started");
     }
 
-    /**
-     * Run the Cabin
-     */
     @Override
     public void run() {
         while (true) {
-            stepTowardsDest();
-            System.out.println("");
+            Message posMsg = softwareBus.get(SoftwareBusCodes.cabinPosition, elevatorID);
+            if (posMsg != null) {
+                currFloor = posMsg.getBody();
+                System.out.println("Elevator " + elevatorID + " position update: floor " + currFloor);
+
+                if (currFloor == currDest && motor) {
+                    stopMotor();
+                }
+            }
+
+            Message dirMsg = softwareBus.get(SoftwareBusCodes.currDirection, elevatorID);
+            if (dirMsg != null) {
+                int dir = dirMsg.getBody();
+                currDirection = (dir == 0) ? Direction.UP :
+                        (dir == 1) ? Direction.DOWN : Direction.STOPPED;
+            }
+
+            try { Thread.sleep(50); }
+            catch (InterruptedException e) { break; }
         }
     }
 
-    public void gotoFloor(int floor){
+    public synchronized void gotoFloor(int floor){
+        if (floor < 1 || floor > 10) return;
+
+        System.out.println("Elevator " + elevatorID + " gotoFloor(" + floor + ") called. Current: " + currFloor);
+
         currDest = floor;
-    }
-    public FloorNDirection currentStatus(){return new FloorNDirection(currFloor,currDirection);}
-    public boolean arrived(){return currFloor == currDest;}
-    public int getTargetFloor(){return currDest;}
 
-
-    // Internal methods
-
-    private synchronized void stepTowardsDest() {
-        topAlign = topAlignment();
-        botAlign = bottomAlignment();
-        currFloor = sensorToFloor(botAlign);
-        if (motor && currFloor == currDest) {
-            stopMotor();
-        } else if (!motor){
-            if (currFloor > currDest) currDirection = Direction.DOWN;
-            else currDirection = Direction.UP;
-            startMotor(currDirection);
+        if (currFloor == currDest) {
+            System.out.println("Elevator " + elevatorID + " already at destination floor " + floor);
+            return;
         }
-    }
-    private int closestFloor() {
-        return -69420;
-    }
 
-    private int sensorToFloor(int sensorPos) {
-        return sensorPos/2 + 1;
-    }
+        Direction dir = (currDest > currFloor) ? Direction.UP : Direction.DOWN;
+        int dirCode = (dir == Direction.UP) ? 0 : 1;
 
+        System.out.println("Elevator " + elevatorID + " dispatching: direction=" + dir + ", dirCode=" + dirCode);
 
-    //Wrapper methods for software bus messages
-    private void startMotor(Direction direction) {
+        softwareBus.publish(new Message(SoftwareBusCodes.carDispatch, elevatorID, dirCode));
         motor = true;
-        //TODO: send message
     }
 
-    private void stopMotor() {
+    private synchronized void stopMotor() {
+        System.out.println("Elevator " + elevatorID + " stopping motor at floor " + currFloor);
         motor = false;
-        //TODO: your sister
+        softwareBus.publish(new Message(SoftwareBusCodes.carStop, elevatorID, 0));
+        currDirection = Direction.STOPPED;
     }
 
-    private int topAlignment() {
-        //TODO: get message from software bus
-        return 0;
-    }
-    private int bottomAlignment() {
-        //TODO: get message from software bus
-        return 0;
+    public FloorNDirection currentStatus() {
+        return new FloorNDirection(currFloor, currDirection);
     }
 
+    public boolean arrived() {
+        return currFloor == currDest;
+    }
+
+    public int getTargetFloor() {
+        return currDest;
+    }
 }

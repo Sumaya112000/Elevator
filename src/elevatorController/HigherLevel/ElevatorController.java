@@ -1,21 +1,38 @@
 package elevatorController.HigherLevel;
 
+import elevatorController.Util.State;
 
-/**
- * The elevator controller is a light-weight object responsible for switching
- * between the elevator’s various modes.
- */
 public class ElevatorController {
-    /**
-     * Create an instance of Elevator Controller
-     * @param normal the normal mode procedure
-     * @param fire the fire mode procedure
-     * @param control the controlled mode procedure
-     */
-    public ElevatorController(Normal normal, Fire fire, Control control) {}
+    private Normal normal;
+    private Fire fire;
+    private Control control;
 
-    /**
-     * Switch between the modes using their return values
-     */
-    public void elevatorController(){}
+    public ElevatorController(Normal normal, Fire fire, Control control) {
+        this.normal = normal;
+        this.fire = fire;
+        this.control = control;
+    }
+
+    public void elevatorController(){
+        State currentState = State.NORMAL;
+
+        System.out.println("ElevatorController started in NORMAL mode");
+
+        while (true) {
+            switch (currentState) {
+                case NORMAL:
+                    currentState = normal.normal();
+                    break;
+                case FIRE:
+                    currentState = fire.fire();
+                    break;
+                case CONTROL:
+                    currentState = control.control();
+                    break;
+                default:
+                    System.err.println("Unknown state: " + currentState);
+                    currentState = State.NORMAL;
+            }
+        }
+    }
 }

@@ -1,88 +1,90 @@
 package elevatorController.LowerLevel;
 
 import Bus.*;
+import Message.*;
 
-/**
- * The door assembly is a virtualization of the physical interfaces which
- * comprise the doors: fully open sensors, fully closed sensors, door
- * obstruction sensors, the scale, and the door motor. The door assembly posts
- * and receives messages from its physical counterparts via the software bus;
- * posting to the motor; receiving from the fully closed sensors, fully open
- * sensors, the scale, and the door obstruction sensors.
- */
 public class DoorAssembly implements Runnable {
-    private boolean opened;  // TODO: do we need to store this in Door Assembly?
+    private boolean opened;
     private boolean closed;
-    private boolean obstructed;
-    private boolean fullyClosed;
-    private boolean fullyOpen;
-    private boolean overCapacity;
+    private volatile boolean obstructed;
+    private volatile boolean fullyClosed;
+    private volatile boolean fullyOpen;
+    private volatile boolean overCapacity;
     private int elevatorID;
     private SoftwareBus softwareBus;
 
-    /**
-     * Instantiate a DoorAssembly object, and run its thread
-     * @param elevatorID For software bus messages
-     * @param softwareBus The means of communication
-     */
-    public DoorAssembly(int elevatorID, SoftwareBus  softwareBus) {
-        //TODO may need to take in int for elevator number for software bus subscription
-        //TODO call subscribe on softwareBus w/ relevant topic/subtopic
-
-        this.opened = true;
-        this.closed = false;
-        this.obstructed = false;
-        this.fullyClosed = false;
-        this.fullyOpen = true;
-        this.overCapacity = false;
+    public DoorAssembly(int elevatorID, SoftwareBus softwareBus) {
+        this.elevatorID = elevatorID;
         this.softwareBus = softwareBus;
-        this.elevatorID = this.elevatorID;
 
-        //Start DoorAssembly Thread
+        softwareBus.subscribe(SoftwareBusCodes.doorStatus, elevatorID);
+        softwareBus.subscribe(SoftwareBusCodes.doorSensor, elevatorID);
+        softwareBus.subscribe(SoftwareBusCodes.cabinLoad, elevatorID);
+
+        this.fullyOpen = true;
+        this.fullyClosed = false;
+        this.obstructed = false;
+        this.overCapacity = false;
+
         Thread thread = new Thread(this);
+        thread.setDaemon(true);
         thread.start();
+
+        System.out.println("DoorAssembly " + elevatorID + " thread started");
     }
 
-    //Todo: Write these methods
-    /**
-     * Send message to softwareBus to open the doors (which sends the message
-     * to the MUX)
-     */
-    public void open(){}
+    public void open(){
+        System.out.println("Elevator " + elevatorID + " opening doors");
+        softwareBus.publish(new Message(SoftwareBusCodes.doorControl, elevatorID, 0));
+    }
 
-    /**
-     * Send message to softwareBus to close the doors (which sends the message
-     * to the MUX)
-     */
-    public void close(){}
+    public void close(){
+        System.out.println("Elevator " + elevatorID + " closing doors");
+        softwareBus.publish(new Message(SoftwareBusCodes.doorControl, elevatorID, 1));
+    }
 
-    /**
-     * @return true if obstruction sensor triggered, false otherwise
-     */
-    public boolean obstructed(){return obstructed;}
-
-    /**
-     * @return true if fully closed sensor triggered, false otherwise
-     */
-    public boolean fullyClosed(){return fullyClosed;}
-
-    /**
-     * @return true if fully open sensor triggered, false otherwise
-     */
-    public boolean fullyOpen(){return fullyOpen;}
-
-    /**
-     * @return true if an over capacity message was received, false if an under
-     *         capacity message was received, true initially
-     */
-    public boolean overCapacity(){return overCapacity;}
-
-    /**
-     * Runs this operation.
-     * query SoftwareBus and set variables appropriately
-     */
     @Override
     public void run() {
+        while (true) {
+            Message statusMsg = softwareBus.get(SoftwareBusCodes.doorStatus, elevatorID);
+            if (statusMsg != null) {
+                int status = statusMsg.getBody();
+                fullyOpen = (status == 0);
+                fullyClosed = (status == 1);
+                System.out.println("Elevator " + elevatorID + " door status: " +
+                        (fullyOpen ? "FULLY OPEN" : (fullyClosed ? "FULLY CLOSED" : "MOVING")));
+            }
 
+            Message obsMsg = softwareBus.get(SoftwareBusCodes.doorSensor, elevatorID);
+            if (obsMsg != null) {
+                obstructed = (obsMsg.getBody() == 0);
+                System.out.println("Elevator " + elevatorID + " obstruction: " + obstructed);
+            }
+
+            Message loadMsg = softwareBus.get(SoftwareBusCodes.cabinLoad, elevatorID);
+            if (loadMsg != null) {
+                overCapacity = (loadMsg.getBody() == 1);
+                System.out.println("Elevator " + elevatorID + " overload: " + overCapacity);
+            }
+
+            try { Thread.sleep(50); }
+            catch (InterruptedException e) { break; }
+        }
+    }
+
+    public boolean obstructed() {
+        return obstructed;
+    }
+
+    public boolean fullyClosed() {
+        return fullyClosed;
+    }
+
+    public boolean fullyOpen() {
+        return fullyOpen;
+    }
+
+    public boolean overCapacity() {
+        return overCapacity;
     }
 }
