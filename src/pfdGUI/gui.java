@@ -322,45 +322,47 @@ public class gui extends Application {
         loader = new imageLoader();
         loader.loadImages();
 
-        ScrollPane scrollPane = new ScrollPane();
-        VBox vbox = new VBox(10);
-        HBox hbox = new HBox();
+        HBox mainContainer = new HBox(20);
 
-        // Create floor displays & call buttons
+        ScrollPane floorScroll = new ScrollPane();
+        VBox floorVBox = new VBox(8);
         for (int i = 0; i < numFloors; i++) {
             callButtons[i] = new CallButton(i);
             Label floorLabel = new Label("Floor " + (i + 1));
-            floorLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 16));
+            floorLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 14));
             floorLabel.setStyle("-fx-text-fill: black;");
-            vbox.getChildren().addAll(floorLabel, callButtons[i].callButtonOverlay);
+            floorVBox.getChildren().addAll(floorLabel, callButtons[i].callButtonOverlay);
         }
         Label floorLabel = new Label("Fire Alarm");
-        floorLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 16));
+        floorLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 14));
         floorLabel.setStyle("-fx-text-fill: black;");
         fireAlarm = new FireAlarm();
-        vbox.getChildren().addAll(floorLabel, fireAlarm.fireAlarmOverlay);
-        scrollPane.setContent(vbox);
-        hbox.getChildren().add(scrollPane);
+        floorVBox.getChildren().addAll(floorLabel, fireAlarm.fireAlarmOverlay);
+        floorScroll.setContent(floorVBox);
+        floorScroll.setPrefViewportWidth(180);
+        mainContainer.getChildren().add(floorScroll);
 
-        // Create cabin panels & elevator doors & overload buttons
+        HBox elevatorsContainer = new HBox(15);
         for (int i = 0; i < numElevators; i++) {
-            VBox v = new VBox();
+            VBox elevatorColumn = new VBox(10);
+            elevatorColumn.setAlignment(Pos.CENTER);
+
             panels[i] = new Panel(i);
             doors[i] = new Door(i);
             displays[i] = new Display(i);
             weighScales[i] = new WeighScale(i);
 
-            v.getChildren().addAll(panels[i].panelOverlay, displays[i].displayOverlay,
+            elevatorColumn.getChildren().addAll(panels[i].panelOverlay, displays[i].displayOverlay,
                     doors[i].doorOverlay, weighScales[i].weightTriggerButton);
-
-            hbox.getChildren().add(v);
-            v.setAlignment(Pos.CENTER);
+            elevatorsContainer.getChildren().add(elevatorColumn);
         }
 
-        double width = Screen.getPrimary().getBounds().getWidth() * (scale - 0.1);
-        double height = Screen.getPrimary().getBounds().getHeight() * (scale - 0.2);
+        mainContainer.getChildren().add(elevatorsContainer);
 
-        Scene scene = new Scene(hbox, width, height, Color.web("#c0bfbbff"));
+        double windowWidth = 1160;
+        double windowHeight = 572;
+
+        Scene scene = new Scene(mainContainer, windowWidth, windowHeight, Color.web("#c0bfbbff"));
         primaryStage.setTitle("Elevator Passenger Devices");
         primaryStage.setScene(scene);
         primaryStage.show();
@@ -377,9 +379,9 @@ public class gui extends Application {
         public  ImageView elevPanelImg = new ImageView();
         public StackPane panelOverlay = new StackPane(elevPanelImg);
         public Label digitalLabel;
-        private double scaleFactor = scale + 0.1;
-        private int yTranslation = -53; // adjust as needed for non 1:1 scales
-        private int offset = 20;
+        private double scaleFactor = 0.7;
+        private int yTranslation = -40; // adjust as needed for non 1:1 scales
+        private int offset = 18;
         private int carId;
 
         private Panel(int index){
@@ -389,22 +391,22 @@ public class gui extends Application {
 
         private void makePanel(){
             elevPanelImg.setPreserveRatio(true);
-            elevPanelImg.setFitWidth(300 * scaleFactor);
+            elevPanelImg.setFitWidth(250 * scaleFactor);
             elevPanelImg.setImage(loader.imageList.get(0)); // 0-2 indices are cabin panels
 
             // Digital Display label
             digitalLabel = new Label("1");
             digitalLabel.setStyle("-fx-text-fill: white;");
-            digitalLabel.setFont(Font.font("Verdana", FontWeight.BOLD, 32));
-            digitalLabel.setTranslateY(-145*scaleFactor);
+            digitalLabel.setFont(Font.font("Verdana", FontWeight.BOLD, 28));
+            digitalLabel.setTranslateY(-130*scaleFactor);
             panelOverlay.getChildren().add(digitalLabel);
 
             // Button overlays
             for (int i = 1; i < 10; i += 2) {
                 Label left = new Label(String.valueOf(i));
                 left.setStyle("-fx-text-fill: black;");
-                left.setFont(Font.font("Verdana", FontWeight.BOLD, 16  * scaleFactor));
-                left.setTranslateX(-23 * scaleFactor);
+                left.setFont(Font.font("Verdana", FontWeight.BOLD, 14  * scaleFactor));
+                left.setTranslateX(-20 * scaleFactor);
                 left.setTranslateY(yTranslation + (offset * i) * scaleFactor);
 
                 // Capture final reference for lambda
@@ -427,8 +429,8 @@ public class gui extends Application {
 
                 Label right = new Label(String.valueOf(i + 1));
                 right.setStyle("-fx-text-fill: black;");
-                right.setFont(Font.font("Verdana", FontWeight.BOLD, 16  * scaleFactor));
-                right.setTranslateX(24  * scaleFactor);
+                right.setFont(Font.font("Verdana", FontWeight.BOLD, 14  * scaleFactor));
+                right.setTranslateX(21  * scaleFactor);
                 right.setTranslateY(yTranslation + (offset * i) * scaleFactor);
 
                 final int rightFloorNumber = i + 1;
@@ -450,11 +452,11 @@ public class gui extends Application {
             }
 
             Button keyButton = new Button();
-            keyButton.setPrefSize(30, 30);
+            keyButton.setPrefSize(25, 25);
             keyButton.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
 
-            double keyX = 20;
-            double keyY = 150;
+            double keyX = 18;
+            double keyY = 130;
 
             keyButton.setTranslateX(keyX);
             keyButton.setTranslateY(keyY);
@@ -480,7 +482,7 @@ public class gui extends Application {
 
         private void makeDoor(){
             elevDoorsImg.setPreserveRatio(true);
-            elevDoorsImg.setFitWidth(300);
+            elevDoorsImg.setFitWidth(250);
             elevDoorsImg.setImage(loader.imageList.get(6));
 
             internalState.doorObstructions[carId] = false;
@@ -517,21 +519,21 @@ public class gui extends Application {
 
         private void makeDisplay(){
             floorDispImg.setPreserveRatio(true);
-            floorDispImg.setFitWidth(120);
+            floorDispImg.setFitWidth(100);
             floorDispImg.setImage(loader.imageList.get(8)); // 8-10 indices are floor displays
 
             // Digital Display label
             digitalLabel = new Label("1");
             digitalLabel.setStyle("-fx-text-fill: white;");
-            digitalLabel.setFont(Font.font("Verdana", FontWeight.BOLD, 18));
+            digitalLabel.setFont(Font.font("Verdana", FontWeight.BOLD, 16));
             digitalLabel.setTranslateY(-5);
             displayOverlay.getChildren().add(digitalLabel);
 
             // Floor number label
             Label floorLabel = new Label(String.valueOf(displayIndex + 1));
             floorLabel.setStyle("-fx-text-fill: black;");
-            floorLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 16));
-            floorLabel.setTranslateY(55);
+            floorLabel.setFont(Font.font("Times New Roman", FontWeight.BOLD, 14));
+            floorLabel.setTranslateY(50);
             displayOverlay.getChildren().add(floorLabel);
         }
     }
@@ -546,10 +548,10 @@ public class gui extends Application {
         }
 
         private void makeTrigger(){
-            weightTriggerButton.setPrefWidth(150);
-            weightTriggerButton.setPrefHeight(50);
+            weightTriggerButton.setPrefWidth(200);
+            weightTriggerButton.setPrefHeight(45);
             weightTriggerButton.setStyle("-fx-background-color: #bdbdbdff; -fx-text-fill: black;");
-            weightTriggerButton.setFont(Font.font("Times New Roman", FontWeight.BOLD, 22));
+            weightTriggerButton.setFont(Font.font("Times New Roman", FontWeight.BOLD, 20));
 
             weightTriggerButton.setOnMouseClicked(event -> {
 
@@ -586,8 +588,8 @@ public class gui extends Application {
 
         private void makeCallButton(){
             elevCallButtonsImg.setPreserveRatio(true);
-            elevCallButtonsImg.setFitWidth(100);
-            elevCallButtonsImg.setFitHeight(100);
+            elevCallButtonsImg.setFitWidth(80);
+            elevCallButtonsImg.setFitHeight(80);
             elevCallButtonsImg.setImage(loader.imageList.get(13)); // 13-16 indices are call buttons
 
             // Bound the click region with quick maths
@@ -601,8 +603,8 @@ public class gui extends Application {
                     // Approximate centers of the upper and lower buttons
                     double centerX = width / 2;
                     double centerY = height / 2;
-                    double offsetY = 20;  // how far each button center is from middle
-                    double radius = 15;   // clickable radius
+                    double offsetY = 18;
+                    double radius = 12;
 
                     // Calculate distances from click point to each button center
                     double distToUp = Math.hypot(clickX - centerX, clickY - (centerY - offsetY));
