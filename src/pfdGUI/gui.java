@@ -673,15 +673,11 @@ public class gui extends Application {
             });
         }
     }
-
     /**************************************************
      * Main Application Entry Point
      ****************************************
      */
-
     public static void main(String[] args) {
         launch(args);
     }
-
-
 }

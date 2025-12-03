@@ -57,7 +57,7 @@ public class ElevatorFloorDisplay {
         System.out.println("*Ding! Elevator " + carId + " has arrived.");
         Platform.runLater(() -> {
             try {
-                URL sound = getClass().getResource("/sounds/ding.mp3");
+                URL sound = getClass().getResource("Elevator/res/sounds/ding.mp3");
                 if (sound == null) {
                     System.err.println("Sound file not found.");
                     return;
@@ -80,7 +80,7 @@ public class ElevatorFloorDisplay {
         System.out.println("*Buzz! Warning: Overload detected on Elevator " + carId);
         Platform.runLater(() -> {
             try {
-                URL sound = getClass().getResource("/sounds/buzz.mp3");
+                URL sound = getClass().getResource("Elevator/res/sounds/buzz.mp3");
                 if (sound == null) {
                     System.err.println("Sound file not found.");
                     return;
