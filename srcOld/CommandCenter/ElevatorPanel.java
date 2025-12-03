@@ -1,8 +1,7 @@
 package CommandCenter;
 
-import Bus.*;
 import Message.*;
-import java.util.concurrent.ConcurrentHashMap;
+import Bus.*;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -18,6 +17,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Polygon;
 import javafx.util.Duration;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * ElevatorPanel
  */
@@ -26,8 +27,8 @@ public class ElevatorPanel extends VBox {
     public enum Direction { UP, DOWN, IDLE }
 
     // state flags
-    // Start visually at floor 1 for demo so GUI matches MUX initial state
-    private int currentFloor = 1;
+    // Start visually at floor 10 (top) for testing demo
+    private int currentFloor = 10;
     private Direction currentDirection = Direction.IDLE;
     private boolean isDoorOpen = false;
     private boolean isEnabled = true;     // true = running
@@ -104,7 +105,6 @@ public class ElevatorPanel extends VBox {
         super(3);
         this.elevatorId = id;
         this.bus = new SoftwareBus(false);
-        System.out.println("ElevatorPanel " + id + " - SoftwareBus client started");
 
         // Subscribe to all topics relevant for this car
         bus.subscribe(SoftwareBusCodes.systemStop, 0);          // System Stop
@@ -203,14 +203,6 @@ public class ElevatorPanel extends VBox {
     private void toggleEnabledState() {
         isEnabled = !isEnabled;
         applyEnabledUI();
-        // Publish individual elevator start/stop so the MUX reacts
-        if (isEnabled) {
-            // publish start for this elevator
-            bus.publish(new Message(SoftwareBusCodes.startElevator, elevatorId, 0));
-        } else {
-            // publish stop for this elevator
-            bus.publish(new Message(SoftwareBusCodes.stopElevator, elevatorId, 0));
-        }
     }
 
     private void applyEnabledUI() {
@@ -257,7 +249,6 @@ public class ElevatorPanel extends VBox {
     }
 
     private void handleCommand(Message m) {
-        System.out.println("ElevatorPanel " + elevatorId + " handleCommand: received message " + m);
         int t = m.getTopic();
         int st = m.getSubTopic();
         int body = m.getBody();
@@ -335,11 +326,9 @@ public class ElevatorPanel extends VBox {
                 logState("Car Dispatch to floor " + assignedFloor);
             });
         } else if(t == SoftwareBusCodes.cabinPosition) {
-            System.out.println("ElevatorPanel " + elevatorId + " - cabinPosition body=" + body);
             Platform.runLater(() -> updateElevatorPosition(body, true));
             setDirection(Direction.IDLE);
         } else if(t == SoftwareBusCodes.doorStatus) {
-            System.out.println("ElevatorPanel " + elevatorId + " - doorStatus body=" + body);
             Platform.runLater(() -> {
                 boolean open = (body == SoftwareBusCodes.doorOpen);
                 setDoorStatus(open);
@@ -354,7 +343,6 @@ public class ElevatorPanel extends VBox {
                 logState("Door " + (open ? "Open" : "Closed"));
             });
         } else if(t == SoftwareBusCodes.displayDirection) {
-            System.out.println("ElevatorPanel " + elevatorId + " - displayDirection body=" + body);
             Platform.runLater(() -> {
                 switch (body) {
                     case 0 -> setDirection(Direction.UP);
@@ -363,14 +351,12 @@ public class ElevatorPanel extends VBox {
                 }
             });
         } else if(t == SoftwareBusCodes.displayFloor) {
-            System.out.println("ElevatorPanel " + elevatorId + " - displayFloor body=" + body);
             Platform.runLater(() -> {
                 currentFloor = body;
                 currentFloorDisplay.setText("" + body);
                 carFloorLabel.setText("" + body);
             });
         } else if(t == SoftwareBusCodes.hallCall) { // HALL CALL HANDLING - ADDED
-            System.out.println("ElevatorPanel " + elevatorId + " - hallCall body=" + body);
             Platform.runLater(() -> {
                 logState("HallCall received");
                 int calledFloor = body;

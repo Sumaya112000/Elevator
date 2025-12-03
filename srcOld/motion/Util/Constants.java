@@ -15,11 +15,11 @@ public class Constants {
     public static final double FLOOR_THICKNESS = 1;
 
     // Maximum speed of elevator (meters per second)
-    public static final double MAX_SPEED = 2; // ~ 400 ft/minute
+    public static final double MAX_SPEED = 1; // ~ 200 ft/minute
 
     /* The distance the cabin travels while accelerating (from max speed to stop
      * or vice versa) in meters */
-    public static final double ACCELERATION_DIST = 0.8;
+    public static final double ACCELERATION_DIST = 1.5;
 
     /* Time it takes for the motor to fully accelerate the cabin from max speed
      * to stop or vice versa (seconds) */
@@ -30,7 +30,7 @@ public class Constants {
     public static final double ACCELERATION = MAX_SPEED / ACCELERATION_TIME;
 
     // How much time between each simulation update, in milliseconds
-    public static final double SIM_SLEEP_TIME = 50;
+    public static final double SIM_SLEEP_TIME = 100;
 
     // Number of ticks per second
     public static final double TICKS_PER_SECOND = 1 / millis_to_seconds(SIM_SLEEP_TIME);

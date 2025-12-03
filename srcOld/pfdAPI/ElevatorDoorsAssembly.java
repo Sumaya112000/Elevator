@@ -30,9 +30,8 @@ public class ElevatorDoorsAssembly {
     public ElevatorDoorsAssembly(int carId, gui.GUIControl guiControl) {
         this.carId = carId;
         this.guiControl = guiControl;
-        // Start doors CLOSED by default so elevators stay closed until a request
-        this.isOpen = false;
-        this.isClosed = true;
+        this.isOpen = true;
+        this.isClosed = false;
         this.isObstructed = false;
         this.isMoving = false;
     }

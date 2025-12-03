@@ -1,25 +1,23 @@
 package pfdGUI;
 
-import Bus.*;
-import Message.*;
 import java.util.ArrayList;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
+import javafx.stage.Screen;
+import javafx.stage.Stage;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
-import javafx.stage.Screen;
-import javafx.stage.Stage;
 import utils.imageLoader;
 
 /** MUX calls api, api modifies the gui. MUX needs to also poll the internal state.
@@ -34,7 +32,6 @@ public class gui extends Application {
     // GUI Control/Query Interface (Contains internal state & control methods)
     public GUIControl internalState = new GUIControl();
     private mux.ElevatorMultiplexor[] elevatorMuxes = new mux.ElevatorMultiplexor[numElevators];
-    private SoftwareBus bus; // bus client for publishing cabin selections when buttons clicked
 
     // Internal State Devices
     private Panel[] panels = new Panel[numElevators];
@@ -368,71 +365,12 @@ public class gui extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        // Create a bus client so GUI can publish cabin selections directly
-        bus = new SoftwareBus(false);
-
-        // Start bus listener to handle resetFloorSelection messages (reset cabin buttons)
-        startBusListener();
-
         // Initialize multiplexors AFTER GUI is fully set up
         new mux.BuildingMultiplexor();
         for (int i = 0; i < numElevators; i++) {
             elevatorMuxes[i] = new mux.ElevatorMultiplexor(i + 1);  // Store the reference
         }
         System.out.println("All multiplexors initialized after GUI setup");
-        System.out.println("PFD_READY");
-    }
-
-    // Bus listener to handle messages from MUX (e.g., resetFloorSelection to clear cabin buttons)
-    private void startBusListener() {
-        Thread busListener = new Thread(() -> {
-            while (true) {
-                for (int elevId = 1; elevId <= numElevators; elevId++) {
-                    // Handle reset floor selection messages (clear cabin panel buttons)
-                    Message msg = bus.get(SoftwareBusCodes.resetFloorSelection, elevId);
-                    if (msg != null) {
-                        final int floor = msg.getBody();
-                        final int elevatorId = elevId;
-                        System.out.println("[PFD] Received resetFloorSelection for elevator " + elevatorId + " floor " + floor);
-                        Platform.runLater(() -> resetPanelButton(elevatorId, floor));
-                    }
-
-                    // Handle door status messages so PFD visuals stay in sync with the bus
-                    Message doorMsg = bus.get(SoftwareBusCodes.doorStatus, elevId);
-                    if (doorMsg != null) {
-                        final int body = doorMsg.getBody();
-                        final int elevatorId = elevId;
-                        final boolean open = (body == SoftwareBusCodes.doorOpen);
-                        System.out.println("[PFD] Received doorStatus for elevator " + elevatorId + " body=" + body + " -> open=" + open);
-                        Platform.runLater(() -> internalState.changeDoorState(elevatorId, open));
-                    }
-                }
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        busListener.setDaemon(true);
-        busListener.start();
-    }
-
-    // Reset a cabin panel button to black (unselected state)
-    private void resetPanelButton(int elevId, int floorNumber) {
-        int elevIndex = elevId - 1;
-        if (elevIndex < 0 || elevIndex >= panels.length) return;
-        
-        Panel panel = panels[elevIndex];
-        // Find the label with the floor number and reset its color
-        for (Node n : panel.panelOverlay.getChildren()) {
-            if (n instanceof Label lbl && lbl.getText().equals(String.valueOf(floorNumber))) {
-                if (lbl == panel.digitalLabel) continue; // Skip digital display label
-                lbl.setStyle("-fx-text-fill: black;");
-                System.out.println("[PFD] Reset cabin button for elevator " + elevId + " floor " + floorNumber);
-                break;
-            }
-        }
     }
 
     private class Panel{
@@ -475,14 +413,9 @@ public class gui extends Application {
                     Platform.runLater(() -> {
                         if(!internalState.panelButtonsDisabled[carId]) {
                             if(!internalState.singleSelection[carId] || internalState.lastSelected == 0) {
-                                // Update GUI state
-                                internalState.pressPanelButton(carId+1, leftFloorNumber);
-                                internalState.lastSelected = leftFloorNumber;
-                                // Publish cabin select and hallCall so elevator moves to selected floor
-                                if (bus != null) {
-                                    bus.publish(new Message(SoftwareBusCodes.cabinSelect, carId+1, leftFloorNumber));
-                                    // Publish hallCall to start motion (cabin button press is an internal request)
-                                    bus.publish(new Message(SoftwareBusCodes.hallCall, carId+1, leftFloorNumber));
+                                if (elevatorMuxes != null && carId < elevatorMuxes.length && elevatorMuxes[carId] != null) {
+                                    elevatorMuxes[carId].getElevator().panel.pressFloorButton(leftFloorNumber);
+                                    internalState.lastSelected = leftFloorNumber;
                                 }
                                 left.setStyle("-fx-text-fill: #ffffffff;");
                             }
@@ -503,14 +436,9 @@ public class gui extends Application {
                     Platform.runLater(() -> {
                         if(!internalState.panelButtonsDisabled[carId]) {
                             if(!internalState.singleSelection[carId] || internalState.lastSelected == 0) {
-                                // Update GUI state
-                                internalState.pressPanelButton(carId+1, rightFloorNumber);
-                                internalState.lastSelected = rightFloorNumber;
-                                // Publish cabin select and hallCall so elevator moves to selected floor
-                                if (bus != null) {
-                                    bus.publish(new Message(SoftwareBusCodes.cabinSelect, carId+1, rightFloorNumber));
-                                    // Publish hallCall to start motion (cabin button press is an internal request)
-                                    bus.publish(new Message(SoftwareBusCodes.hallCall, carId+1, rightFloorNumber));
+                                if (elevatorMuxes != null && carId < elevatorMuxes.length && elevatorMuxes[carId] != null) {
+                                    elevatorMuxes[carId].getElevator().panel.pressFloorButton(rightFloorNumber);
+                                    internalState.lastSelected = rightFloorNumber;
                                 }
                                 right.setStyle("-fx-text-fill: #ffffffff;");
                             }
@@ -553,8 +481,7 @@ public class gui extends Application {
         private void makeDoor(){
             elevDoorsImg.setPreserveRatio(true);
             elevDoorsImg.setFitWidth(300);
-            // Start with doors visually CLOSED (index 3 is closed door image)
-            elevDoorsImg.setImage(loader.imageList.get(3));
+            elevDoorsImg.setImage(loader.imageList.get(6));
 
             internalState.doorObstructions[carId] = false;
 
@@ -692,12 +619,6 @@ public class gui extends Application {
                                     callButtons[buttonIndex].direction = "UP";
                                     elevCallButtonsImg.setImage(loader.imageList.get(15));
                                 }
-
-                                // Choose nearest elevator and publish a targeted hallCall
-                                int chosenElev = chooseNearestElevator(buttonIndex + 1);
-                                if (bus != null && chosenElev > 0) {
-                                    bus.publish(new Message(SoftwareBusCodes.hallCall, chosenElev, buttonIndex + 1));
-                                }
                             }
                         });
                     } else if (distToDown <= radius) {
@@ -711,12 +632,6 @@ public class gui extends Application {
                                     callButtons[buttonIndex].direction = "DOWN";
                                     elevCallButtonsImg.setImage(loader.imageList.get(14));
                                 }
-
-                                // Choose nearest elevator and publish a targeted hallCall
-                                int chosenElev = chooseNearestElevator(buttonIndex + 1);
-                                if (bus != null && chosenElev > 0) {
-                                    bus.publish(new Message(SoftwareBusCodes.hallCall, chosenElev, buttonIndex + 1));
-                                }
                             }
                         });
                     } else {
@@ -729,22 +644,6 @@ public class gui extends Application {
 
         public void setDirection(String direction) {
             this.direction = direction;
-        }
-
-        // Choose the nearest elevator (simple heuristic) based on displayed floor
-        private int chooseNearestElevator(int floorNumber) {
-            int bestId = -1;
-            int bestDist = Integer.MAX_VALUE;
-            for (int i = 0; i < numElevators; i++) {
-                int disp = 1;
-                try { disp = Integer.parseInt(displays[i].digitalLabel.getText()); } catch (Exception ignored) {}
-                int dist = Math.abs(disp - floorNumber);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestId = i + 1; // elevator IDs are 1-based
-                }
-            }
-            return bestId;
         }
     }
 
@@ -766,17 +665,9 @@ public class gui extends Application {
                     if (isActive) {
                         internalState.fireAlarmActive = false;
                         fireAlarmImg.setImage(loader.imageList.get(11));
-                        // Publish clear fire to the system so MUXes resume normal operation
-                        if (bus != null) {
-                            bus.publish(new Message(SoftwareBusCodes.clearFire, 0, 0));
-                        }
                     } else {
                         internalState.fireAlarmActive = true;
                         fireAlarmImg.setImage(loader.imageList.get(12));
-                        // Publish fire mode to the system so MUXes recall to floor 1
-                        if (bus != null) {
-                            bus.publish(new Message(SoftwareBusCodes.setMode, 0, SoftwareBusCodes.fire));
-                        }
                     }
                 });
             });

@@ -2,14 +2,16 @@ package mux;
 
 import Bus.*;
 import Message.*;
-import static java.lang.Math.abs;
-import java.net.URL;
-import java.util.Arrays;
 import javafx.application.Platform;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import pfdAPI.Building;
 import pfdAPI.FloorCallButtons;
+
+import java.net.URL;
+import java.util.Arrays;
+
+import static java.lang.Math.abs;
 
 /**
  * Class that defines the BuildingMultiplexor, which coordinates communication from the Elevator
@@ -133,8 +135,7 @@ public class BuildingMultiplexor {
             int elevator = bestElevator(floor);
             if (bldg.callButtons[floor].isUpCallPressed() && !lastCallState[floor][0]) {
                 System.out.println("Closest elev is " + (elevator+1) + ", floor is " + (floor+1));
-                // Publish hall call with plain floor number (1..N). Direction encoded via caller or inferred.
-                bus.publish(new Message(SoftwareBusCodes.hallCall, elevator + 1, floor + 1));
+                bus.publish(new Message(SoftwareBusCodes.hallCall, elevator + 1, floor + 1 + 100));
                 lastCallState[floor][0] = true;
             }
 
@@ -237,26 +238,20 @@ public class BuildingMultiplexor {
 
     private void playFireAlarm(){
         System.out.println("FIRE!");
-        try {
-            Platform.runLater(() -> {
-                try {
-                    URL sound = getClass().getResource("Elevator/res/sounds/firealarm.mp3");
-                    if (sound == null) {
-                        System.err.println("Sound file not found.");
-                        return;
-                    }
-
-                    Media media = new Media(sound.toExternalForm());
-                    MediaPlayer player = new MediaPlayer(media);
-                    player.play();
-                } catch (Exception e) {
-                    e.printStackTrace();
+        Platform.runLater(() -> {
+            try {
+                URL sound = getClass().getResource("Elevator/res/sounds/firealarm.mp3");
+                if (sound == null) {
+                    System.err.println("Sound file not found.");
+                    return;
                 }
-            });
-        } catch (IllegalStateException e) {
-            // JavaFX toolkit not initialized in this JVM (e.g., when running in headless test harness).
-            // Fall back to a console-only notification so tests can proceed.
-            System.out.println("FIRE! (JavaFX not initialized - skipping audio)");
-        }
+
+                Media media = new Media(sound.toExternalForm());
+                MediaPlayer player = new MediaPlayer(media);
+                player.play();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 }

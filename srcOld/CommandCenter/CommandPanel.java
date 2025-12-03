@@ -86,8 +86,6 @@ public class CommandPanel extends GridPane {
         bus.subscribe(SoftwareBusCodes.systemStart, SoftwareBusCodes.allElevators);
         bus.subscribe(SoftwareBusCodes.clearFire,   SoftwareBusCodes.allElevators);
         bus.subscribe(SoftwareBusCodes.setMode,     SoftwareBusCodes.allElevators);
-        // Listen for building/hallway fire alarm active state (subtopic 5)
-        bus.subscribe(SoftwareBusCodes.fireAlarmActive, 5);
 
         // Layout grid
         setStyle("-fx-background-color: #333333;");
@@ -300,7 +298,6 @@ public class CommandPanel extends GridPane {
                 poll(SoftwareBusCodes.systemStart, 0);  // System Start
                 poll(SoftwareBusCodes.clearFire, 0);    // Clear Fire
                 poll(SoftwareBusCodes.setMode, 0);      // Mode (1000/1100/1110)
-                poll(SoftwareBusCodes.fireAlarmActive, 5); // Hallway fire alarm state
 
                 try {
                     Thread.sleep(10);
@@ -366,29 +363,6 @@ public class CommandPanel extends GridPane {
 
                 } else {
                     System.out.println("Unknown mode body: " + body);
-                }
-            });
-        } else if (t == SoftwareBusCodes.fireAlarmActive) {
-
-            Platform.runLater(() -> {
-                if (body == 1) {
-                    // Hallway fire active: show an alert state on the panel
-                    modeDisplay.setText("HALL FIRE");
-                    modeDisplay.setStyle(modeDisplayBaseStyle + colorModeFire);
-                    // disable non-emergency controls while alarm active
-                    startButton.setDisable(true);
-                    stopButton.setDisable(true);
-                    autoButton.setDisable(true);
-                    // Ensure the clear-fire control is available so operator can clear the alarm
-                    fireControlButton.setDisable(false);
-                    // Reflect fire mode visuals
-                    systemMode = "FIRE";
-                    updateForFireMode(true);
-                } else {
-                    // cleared
-                    updateForFireMode(false);
-                    updateForAutoMode("CENTRALIZED");
-                    updateButtonStates(true);
                 }
             });
         }

@@ -1,7 +1,8 @@
 package Bus;
 
-import Message.*;
 import java.util.*;
+
+import Message.*;
 
 public class SoftwareBus {
 
@@ -20,8 +21,6 @@ public class SoftwareBus {
         queue = new SoftwareBusQueue();
         subscriptions = new HashSet<>();
         network = new SoftwareBusInternalNetwork(isServer);
-
-        System.out.println("SoftwareBus initialized (isServer=" + isServer + ")");
 
         network.setMessageListener(msg -> {
             synchronized (subscriptions) {
@@ -53,7 +52,6 @@ public class SoftwareBus {
      * - In client mode: send the message to the central server.
      */
     public void publish(Message message) {
-        System.out.println("SoftwareBus.publish -> " + message);
         network.broadcast(message);
     }
 

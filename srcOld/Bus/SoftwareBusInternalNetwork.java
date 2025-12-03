@@ -1,6 +1,7 @@
 package Bus;
 
 import Message.*;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -27,23 +28,14 @@ public class SoftwareBusInternalNetwork {
     public SoftwareBusInternalNetwork(boolean isServer) {
         this.isServer = isServer;
         this.clientSockets = new HashSet<>();
+
         if (isServer) {
-            // Server mode: try to create a listening socket
+            // Server mode: create a listening socket and start accept thread
             try {
                 serverSocket = new ServerSocket(port);
                 acceptThread();
             } catch (IOException e) {
-                // If the port is already bound, fall back to client mode and connect
-                System.err.println("Port " + port + " already in use; falling back to client mode.");
-                this.isServer = false;
-                try {
-                    busSocket = new Socket("localhost", port);
-                    out = new PrintWriter(busSocket.getOutputStream(), true);
-                    readerThread(busSocket);
-                } catch (IOException ex) {
-                    // Could not connect to existing server - rethrow original exception
-                    throw new RuntimeException(e);
-                }
+                throw new RuntimeException(e);
             }
         } else {
             // Client mode: connect to the server
@@ -149,8 +141,6 @@ public class SoftwareBusInternalNetwork {
                 listener.onMessage(message);
             }
 
-            System.out.println("Server broadcasting message: " + message);
-
             synchronized (clientSockets) {
                 for (Socket client : clientSockets) {
                     try {
@@ -163,7 +153,6 @@ public class SoftwareBusInternalNetwork {
                 }
             }
         } else {
-            System.out.println("Client sending message upstream: " + message);
             out.println(message.toString());
         }
     }
