@@ -43,7 +43,7 @@ public class Normal {
                 doorManagementActive = true;
 
                 // Clear the button light upon arrival/door opening
-                buttons.requestReset(currentStatus.floor());
+                buttons.callReset(currentStatus.floor());
             } else if (doorAssembly.fullyOpen()) {
                 if (doorAssembly.overCapacity()) {
                     notifier.playCapacityNoise();

@@ -31,9 +31,10 @@ public class Buttons {
         this.lastRequest = null;
     }
 
-    public void callReset(FloorNDirection floorNDirection) {
-        destinations.remove(floorNDirection);
+    public void callReset(int floor) {
+        destinations.removeIf(d -> d.floor() == floor);
     }
+
 
     public void requestReset(int floor) {
         destinations.removeIf(d -> d.getFloor() == floor && d.getDirection() == Direction.STOPPED);

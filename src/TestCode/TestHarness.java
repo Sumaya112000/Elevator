@@ -112,7 +112,7 @@ public class TestHarness {
             if (!guiReady) System.err.println("Command Center failed to start after restart attempt.");
         }
 
-     
+
         List<ElevatorMultiplexor> elevMuxes = new ArrayList<>();
         boolean startedLocalMuxes = false;
         try {

@@ -14,7 +14,7 @@ public class imageLoader {
     // All images in res
     public final ArrayList<Image> imageList = new ArrayList<>();
     // Path to res folder
-    private final String IMAGE_PATH = "Elevator/res/";
+    private final String IMAGE_PATH = "res/";
 
     /**
      * Function to load the image resources to the imageList array.
