@@ -1,65 +1,79 @@
 package elevatorController.LowerLevel;
 
 import Bus.*;
+import Message.Message;
 import elevatorController.Util.FloorNDirection;
 import elevatorController.Util.State;
+import static elevatorController.Util.ConstantsElevatorControl.*;
 
-/**
- * The mode serves as a means for the Elevator Controller to be put into and track its current mode.
- * The mode is indirectly being updated by the Control Room, a separate entity outside of the Elevator Controller system.
- * Additionally, the mode is responsible for taking in demands from the Control Room when the elevator is being remotely controlled.
- * The mode object receives messages via the software bus but does not post messages to the software bus.
- *
- * The modes:
- *         1 – NORMAL
- *         2 – FIRE_SAFETY
- *         3 - CONTROLLED
- */
 public class Mode {
     private int elevatorID;
     private SoftwareBus softwareBus;
     private State currentMode;
     private FloorNDirection currDestination;
 
-    /**
-     * Instantiate a Mode object
-     * @param elevatorID which elevator this Mode object is associated with
-     *                   (for software bus messages)
-     * @param softwareBus the means of communication
-     */
     public Mode(int elevatorID, SoftwareBus softwareBus) {
-        //TODO call subscribe on softwareBus w/ relevant topic/subtopic
         this.softwareBus = softwareBus;
         this.elevatorID = elevatorID;
 
-        this.currDestination = null;
+        // Subscribing to mode topics (2-argument signature)
+        softwareBus.subscribe(this.elevatorID, MODE);
+        softwareBus.subscribe(this.elevatorID, clearFire); // Separate topic for clear fire signal
+        softwareBus.subscribe(this.elevatorID, CABIN); // For CONTROL commands
+        softwareBus.subscribe(this.elevatorID, FIREKEY); // For Fire Key status
 
-        // Initially in Normal mode
+        this.currDestination = null;
         this.currentMode = State.NORMAL;
     }
 
-    /**
-     * Call get() on softwareBus w/ appropriate topic/subtopic, until NULL is returned (only care about most recent mode
-     * set), store last valid mode in currentMode, return currentMode
-     * @return the currentMode this elevator is in
-     */
     public State getMode(){
         setCurrentMode();
         return currentMode;
     }
 
-    /**
-     * Pulls all related messages from softwareBUs until null and
-     * sets current mode equal to the last relevant message
-     */
     private void setCurrentMode(){
-        //Todo: Set current mode from software bus
+        Message m;
+        State lastValidMode = currentMode;
+
+        // Use get(int recipientID, int topic) and m.getBody()
+        while ((m = softwareBus.get(this.elevatorID, MODE)) != null) {
+
+            if (m.getBody() == FIRE) {
+                lastValidMode = State.FIRE;
+            } else if (m.getBody() == NORMAL) {
+                lastValidMode = State.NORMAL;
+            } else if (m.getBody() == CONTROLL) {
+                lastValidMode = State.CONTROL;
+            }
+        }
+
+        // Handle clearFire signal (separate topic)
+        while ((m = softwareBus.get(this.elevatorID, clearFire)) != null) {
+            lastValidMode = State.NORMAL;
+        }
+
+        // Handle Fire Key signal (separate topic)
+        while ((m = softwareBus.get(this.elevatorID, FIREKEY)) != null) {
+            if (currentMode == State.FIRE) {
+                // Fire key inserted (body=1) allows for controlled movement within Fire mode
+                if (m.getBody() == 1) lastValidMode = State.CONTROL;
+                    // Fire key removed (body=0) reverts to pure Fire mode
+                else if (m.getBody() == 0) lastValidMode = State.FIRE;
+            }
+        }
+
+        currentMode = lastValidMode;
     }
 
-    /**
-     * Call get() on softwareBus w/ appropriate topic/subtopic,
-     * @return
-     */
-    public FloorNDirection nextService(){return null;}
-
+    public FloorNDirection nextService(){
+        Message m;
+        // Use get(int recipientID, int topic) and m.getBody()
+        while ((m = softwareBus.get(this.elevatorID, CABIN)) != null) {
+            int floor = m.getBody();
+            if (floor >= FLOOR_ONE && floor <= FLOOR_TEN) {
+                currDestination = new FloorNDirection(floor, elevatorController.Util.Direction.STOPPED);
+            }
+        }
+        return currDestination;
+    }
 }

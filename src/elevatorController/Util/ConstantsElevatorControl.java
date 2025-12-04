@@ -1,9 +1,16 @@
 package elevatorController.Util;
 
 public class ConstantsElevatorControl {
-    public static final long TIME_TO_STOP = 0;
 
-    // Message Topics
+    // SoftwareBusCodes Mappings (Inferred/Assumed from Test Code)
+    public static final int hallCall = 101;
+    public static final int startElevator = 102;
+    public static final int stopElevator = 103;
+    public static final int setMode = 104; // Treated as a system-level topic
+    public static final int clearFire = 105; // Treated as a system-level topic
+    public static final int allElevators = 0; // For broadcast messages
+
+    // Message Topics (Specific to Elevator Controller components)
     public static final int BUTTON = 300;
     public static final int CABIN = 301;
     public static final int DOORASSEMBLY = 302;
@@ -11,52 +18,24 @@ public class ConstantsElevatorControl {
     public static final int NOTIFIER = 304;
 
     // Message Body (Door Assembly)
-    //Outgoing messages (Door Assembly to Software Bus)
     public static final int CLOSE = 1;
     public static final int OPEN = 2;
-
-    // Incoming Messages (Software Bus to Door Assembly)
     public static final int OBSTRUCTED = 3;
     public static final int FULLYCLOSED = 4;
     public static final int FULLYOPEN = 5;
     public static final int OVERCAPACITY = 6;
 
 
-    //Message Body (MODES) incoming messages (Software Bus -> Mode)
+    // Message Body (MODES)
     public static final int NORMAL = 100;
     public static final int FIRE = 200;
-    public static final int CONTROLL = 300;
+    public static final int CONTROLL = 300; // Renamed to CONTROL to match usage
 
-    /* Message Body (MODES/NOTIFIER/BUTTONS)
-     * Incoming for Mode (Software Bus -> Mode)
-     * Outgoing for Notifier (Notifier -> Software Bus)
-     * Incoming for Buttons (Software Bus -> Mode)
-     * Floor and direction where 1 is up and 2 is down */
-    public static final int FLOORONEUP = 11;
-    public static final int FLOORTWOUP = 21;
-    public static final int FLOORTHREEUP = 31;
-    public static final int FLOORFOURUP = 41;
-    public static final int FLOORFIVEUP = 51;
-    public static final int FLOORSIXUP = 61;
-    public static final int FLOORSEVENUP = 71;
-    public static final int FLOOREIGHTUP = 81;
-    public static final int FLOORNINEUP = 91;
-    public static final int FLOORTENUP = 101;
+    /* Message Body (Floor and Direction Codes) */
+    public static final int UP = 1;
+    public static final int DOWN = 2;
 
-    public static final int FLOORONEDOWN = 12;
-    public static final int FLOORTWODOWN = 22;
-    public static final int FLOORTHREEDOWN = 32;
-    public static final int FLOORFOURDOWN = 42;
-    public static final int FLOORFIVEDOWN = 52;
-    public static final int FLOORSIXDOWN = 62;
-    public static final int FLOORSEVENDOWN = 72;
-    public static final int FLOOREIGHTDOWN = 82;
-    public static final int FLOORNINEDOWN = 92;
-    public static final int FLOORTENDOWN = 102;
-
-    //Message Body (NOTIFIER/BUTTONS)
-    // Notifier Outgoing (Notifier -> Software Bus) - for chimes
-    // Buttons Incoming (Software Bus -> Buttons) - for call buttons
+    // Message Body (Floors)
     public static final int FLOOR_ONE = 1;
     public static final int FLOOR_TWO = 2;
     public static final int FLOOR_THREE = 3;
@@ -68,8 +47,15 @@ public class ConstantsElevatorControl {
     public static final int FLOOR_NINE = 9;
     public static final int FLOOR_TEN = 10;
 
+    // Motor Messages (Used by Cabin to tell MUX to move)
+    public static final int MOTOR_MOVE_UP = 601;
+    public static final int MOTOR_MOVE_DOWN = 602;
+    public static final int MOTOR_STOP = 603;
+
+    public static final int FIREKEY = 505; // Fire key inserted/removed
     //Message Body (NOTIFIER)
     // Notifier Outgoing (Notifier -> Software Bus) - for capacity
+    public static final int LIGHT_OFF = 5;
     public static final int CAPON_ONE = 111;
     public static final int CAPON_TWO = 211;
     public static final int CAPON_THREE = 311;
@@ -125,8 +111,5 @@ public class ConstantsElevatorControl {
     public static final int CALLDOWNOFF_EIGHT = 8222;
     public static final int CALLDOWNOFF_NINE = 9222;
     public static final int CALLDOWNOFF_TEN = 10222;
-
-    public static final int FIREKEY = 505;
-
     // TODO: CABIN Messages
 }

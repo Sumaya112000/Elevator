@@ -240,7 +240,7 @@ public class BuildingMultiplexor {
         try {
             Platform.runLater(() -> {
                 try {
-                    URL sound = getClass().getResource("Elevator/res/sounds/firealarm.mp3");
+                    URL sound = getClass().getResource("/sounds/firealarm.mp3");
                     if (sound == null) {
                         System.err.println("Sound file not found.");
                         return;

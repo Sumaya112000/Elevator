@@ -3,16 +3,7 @@ package elevatorController.HigherLevel;
 import Bus.*;
 import elevatorController.LowerLevel.*;
 
-/**
- * Main is a lightweight object, which instantiates Elevator Controller, Mode,
- * Buttons, Cabin, Door Assembly and Notifier.
- */
 public class ElevatorMain {
-    /**
-     * Instantiate Everything
-     * @param elevatorID the number associated with this elevator
-     * @param softwareBus the means of communication
-     */
     private Buttons buttons;
     private Cabin cabin;
     private DoorAssembly doorAssembly;
@@ -21,16 +12,30 @@ public class ElevatorMain {
     private Fire fire;
     private Normal normal;
     private Control control;
+    private ElevatorController controller;
 
     public ElevatorMain(int elevatorID, SoftwareBus softwareBus){
+        // 1. Instantiate Lower Level Objects
         buttons = new Buttons(elevatorID, softwareBus);
         cabin = new Cabin(elevatorID, softwareBus);
         doorAssembly = new DoorAssembly(elevatorID, softwareBus);
         notifier = new Notifier(elevatorID, softwareBus);
         mode = new Mode(elevatorID, softwareBus);
+
+        // 2. Instantiate Higher Level Mode Procedures
         fire = new Fire(mode,buttons,cabin,doorAssembly,notifier);
         normal = new Normal(mode,buttons,cabin,doorAssembly,notifier);
         control = new Control(mode,buttons,cabin,doorAssembly,notifier);
 
+        // 3. Instantiate the Controller and start the main loop
+        controller = new ElevatorController(normal, fire, control);
+
+        Thread controllerThread = new Thread(() -> {
+            controller.elevatorController();
+        });
+        controllerThread.setName("ElevatorController-" + elevatorID);
+        controllerThread.start();
+
+        System.out.println("Elevator " + elevatorID + " fully initialized.");
     }
 }

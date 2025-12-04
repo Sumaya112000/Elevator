@@ -1,30 +1,18 @@
 package elevatorController.HigherLevel;
 
 import elevatorController.LowerLevel.*;
+import elevatorController.Util.FloorNDirection;
 import elevatorController.Util.State;
+import static elevatorController.Util.ConstantsElevatorControl.*;
 
-/**
- * Normal mode is the default mode that the system starts in. The initial state
- * of each elevator is on the first floor with the doors open.  In this mode,
- * no messages from the supervisor are expected, other than a change in mode;
- * the movement is determined solely by button presses. This mode provides the
- * typical elevator functionality: handling requests and navigating floors.
- */
 public class Normal {
     private Mode mode;
     private Buttons buttons;
     private Cabin cabin;
     private DoorAssembly doorAssembly;
     private Notifier notifier;
+    private boolean doorManagementActive;
 
-    /**
-     * Create an instance of the Normal Object/Procedure
-     * @param mode the mode lower level object
-     * @param buttons the buttons lower level object
-     * @param cabin the cabin lower level object
-     * @param doorAssembly the door assembly lower level object
-     * @param notifier the notifier lower level object
-     */
     public Normal(Mode mode, Buttons buttons, Cabin cabin,
                   DoorAssembly doorAssembly, Notifier notifier) {
         this.mode = mode;
@@ -32,13 +20,60 @@ public class Normal {
         this.cabin = cabin;
         this.doorAssembly = doorAssembly;
         this.notifier = notifier;
+        this.doorManagementActive = false;
     }
 
-    /**
-     * Normal mode implementation
-     * @return The state to switch too (fire or control)
-     */
     public State normal(){
-        return null;
+        // Check for mode change
+        State newMode = mode.getMode();
+        if (newMode != State.NORMAL && newMode != State.NULL) {
+            if (doorAssembly.fullyOpen()) doorAssembly.close();
+            return newMode;
+        }
+
+        buttons.enableCalls();
+        buttons.enableAllRequests();
+
+        // Door Management
+        if (cabin.arrived()) {
+            FloorNDirection currentStatus = cabin.currentStatus();
+
+            if (!doorAssembly.fullyOpen() && !doorManagementActive) {
+                doorAssembly.open();
+                notifier.arrivedAtFloor(currentStatus);
+                doorManagementActive = true;
+
+                // Clear the button light upon arrival/door opening
+                buttons.requestReset(currentStatus.floor());
+            } else if (doorAssembly.fullyOpen()) {
+                if (doorAssembly.overCapacity()) {
+                    notifier.playCapacityNoise();
+                } else {
+                    notifier.stopCapacityNoise();
+                }
+
+                if (doorAssembly.obstructed()) {
+                    // Doors obstructed, wait
+                } else {
+                    if (buttons.nextService(currentStatus) == null) {
+                        doorAssembly.close();
+                        doorManagementActive = false;
+                    }
+                }
+            }
+        }
+
+        // Movement Logic (only if doors are fully closed or in motion)
+        if (doorAssembly.fullyClosed()) {
+            FloorNDirection nextDest = buttons.nextService(cabin.currentStatus());
+
+            if (nextDest != null) {
+                cabin.gotoFloor(nextDest.floor());
+            }
+        }
+
+        notifier.elevatorStatus(cabin.currentStatus());
+
+        return State.NORMAL;
     }
 }

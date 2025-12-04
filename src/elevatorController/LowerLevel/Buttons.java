@@ -1,99 +1,99 @@
 package elevatorController.LowerLevel;
 
 import Bus.*;
+import Message.Message;
+import elevatorController.Util.Direction;
 import elevatorController.Util.FloorNDirection;
+import static elevatorController.Util.ConstantsElevatorControl.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Comparator;
 
-/**
- * The buttons object enables the Elevator Controller to track and schedule its destinations. The buttons object
- * indirectly receives floor requests via the physical buttons on the panel inside the cabin, as well as the call
- * buttons on each level. These button events are being received via the software bus.
- * The buttons object does not post any messages to the Software Bus.
- */
 public class Buttons {
     private boolean callEnabled;
     private boolean multipleRequests;
     private int elevatorID;
     private List<FloorNDirection> destinations;
     private SoftwareBus softwareBus;
+    private FloorNDirection lastRequest;
 
-    /**
-     * Instantiate a Buttons Object
-     * @param elevatorID the elevator number associated with this Buttons Object
-     *                   (for software bus messages)
-     * @param softwareBus the means of communication
-     */
     public Buttons(int elevatorID, SoftwareBus softwareBus) {
-        //TODO call subscribe on softwareBus w/ relevant topic/subtopic
+        // softwareBus.subscribe(int recipientID, int topic)
+        softwareBus.subscribe(this.elevatorID, BUTTON);
+        softwareBus.subscribe(this.elevatorID, hallCall);
 
-        // Assuming normal mode settings initially
         this.callEnabled = true;
         this.multipleRequests = true;
-
         this.destinations = new ArrayList<>();
         this.softwareBus = softwareBus;
         this.elevatorID = elevatorID;
+        this.lastRequest = null;
     }
 
-    /**
-     * Call publish on the softwareBus with a message that the call button of the given floor, and given direction can be
-     * turned off
-     * Remove that floor from destinations
-     * @param floorNDirection The call button and direction which is no longer relevant
-     */
-    public void callReset(FloorNDirection floorNDirection) {}
-
-    /**
-     * Call publish on softwareBus with a message that the call button on the given floor, and given direction can be
-     * turned off
-     * Remove that floor from destinations
-     * @param floor the floor request button that is no longer relevant
-     */
-    public void requestReset(int floor) {}
-
-    /**
-     * In normal mode, level call buttons are enabled
-     */
-    public void enableCalls(){
-        this.callEnabled = true;
+    public void callReset(FloorNDirection floorNDirection) {
+        destinations.remove(floorNDirection);
     }
 
-    /**
-     * In fire mode, and controlled mode call buttons are disabled
-     */
-    public void disableCalls(){
-        this.callEnabled = false;
+    public void requestReset(int floor) {
+        destinations.removeIf(d -> d.getFloor() == floor && d.getDirection() == Direction.STOPPED);
+        if (!multipleRequests && lastRequest != null && lastRequest.getFloor() == floor) {
+            lastRequest = null;
+        }
+        softwareBus.publish(new Message(NOTIFIER, LIGHT_OFF, floor));
     }
 
-    /**
-     * In Normal mode, all request buttons are enabled
-     */
-    public void enableAllRequests(){
-        this.multipleRequests = true;
+    public void enableCalls(){ this.callEnabled = true; }
+    public void disableCalls(){ this.callEnabled = false; }
+    public void enableAllRequests(){ this.multipleRequests = true; }
+    public void enableSingleRequest(){ this.multipleRequests = false; }
+
+    public FloorNDirection nextService(FloorNDirection currentStatus) {
+
+        Message m;
+        // Use get(int recipientID, int topic) and m.getTopic()/m.getBody()
+        while (true) {
+            m = softwareBus.get(this.elevatorID, BUTTON); // Cabin button presses
+            if (m == null) {
+                m = softwareBus.get(this.elevatorID, hallCall); // Hall call assignments
+            }
+
+            if (m == null) break;
+
+            int floor = m.getBody();
+
+            if (m.getTopic() == BUTTON) {
+                // Cabin Request (always processed)
+            } else if (m.getTopic() == hallCall && callEnabled) {
+                // Hall Call (processed only if calls are enabled)
+            } else {
+                continue; // Ignore hall call if disabled
+            }
+
+            FloorNDirection newDest = new FloorNDirection(floor, Direction.STOPPED);
+
+            if (multipleRequests) {
+                if (!destinations.contains(newDest)) destinations.add(newDest);
+            } else {
+                lastRequest = newDest;
+                destinations.clear();
+                destinations.add(newDest);
+            }
+        }
+
+        if (destinations.isEmpty()) return null;
+
+        // Simple Elevator Scheduling: Closest destination in the current direction.
+        final Direction currentDir = currentStatus.direction();
+        final int currentFloor = currentStatus.floor();
+
+        return destinations.stream()
+                .filter(d -> {
+                    if (currentDir == Direction.UP) return d.floor() >= currentFloor;
+                    if (currentDir == Direction.DOWN) return d.floor() <= currentFloor;
+                    return true;
+                })
+                .min(Comparator.comparingInt(d -> Math.abs(d.floor() - currentFloor)))
+                .orElse(destinations.get(0));
     }
-
-    /**
-     * In Fire mode, the request buttons in the cabin are mutually exclusive
-     */
-    public void enableSingleRequest(){
-        this.multipleRequests = false;
-    }
-
-
-    /*
-     * Note; call events have associated directions, and request events do not
-     *
-     * If multipleRequests enabled, keep calling get() on software bus, add them to associated lists, use given
-     * floorNDirection to determine which is best.
-     *
-     * If multipleRequests are disabled, keep calling get() on software bus, ignore all but the most recent.
-     *
-     * If calls are disabled, ignore all call button presses (those associated with level)
-     *
-     * @param floorNDirection record holding the floor and direction
-     * @return next service direction and floor (direction non-null for call buttons, null for requests)
-     */
-    public FloorNDirection nextService(FloorNDirection floorNDirection) {return null;}
 }
