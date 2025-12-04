@@ -10,12 +10,11 @@ import mux.*;
 
 /**
  * Integration Test Harness
- * - Launches the Command Center GUI in a subprocess (uses same classpath)
- * - Starts BuildingMultiplexor and 4 ElevatorMultiplexor instances in this JVM
- * - Uses a SoftwareBus client to run a series of tests (hall calls, fire recall, clear)
+ * - Launches BOTH the Command Center GUI and the Passenger Device (PFD) GUI in subprocesses
+ * - Starts BuildingMultiplexor and 4 ElevatorMultiplexor instances (in PFD or locally as fallback)
+ * - Provides a SoftwareBus client from this JVM to publish system start messages
  *
- * Run from your IDE or command line. The harness will attempt to start the GUI using
- * the current JVM classpath so the Command Center becomes the SoftwareBus server.
+ * Run from your IDE or command line. Both GUI windows will appear automatically.
  */
 public class TestHarness {
 
@@ -113,9 +112,7 @@ public class TestHarness {
             if (!guiReady) System.err.println("Command Center failed to start after restart attempt.");
         }
 
-        // If the passenger-device GUI subprocess started successfully, it will create
-        // its own BuildingMultiplexor and ElevatorMultiplexor instances. Only start
-        // local MUXes in this JVM when the PFD subprocess failed to start.
+     
         List<ElevatorMultiplexor> elevMuxes = new ArrayList<>();
         boolean startedLocalMuxes = false;
         try {
@@ -143,18 +140,7 @@ public class TestHarness {
         bus.publish(new Message(SoftwareBusCodes.systemStart, 0, 0));
         Thread.sleep(1000);
 
-        // No automatic hall calls by default - elevators will only move in
-        // response to hallway requests issued interactively from the PFD GUI.
 
-        // Previously this harness simulated elevator recall and movement which
-        // caused unsolicited motion. That behavior is removed so elevators only
-        // move in response to actual `carDispatch` or `cabinSelect` messages
-        // coming from the GUIs or a scheduler.
-
-        // If you want to test FIRE mode manually, use the Command Center's
-        // TEST FIRE / CLEAR FIRE buttons or publish `setMode` / `clearFire`
-        // from a separate test client. For now we simply leave the system
-        // running for manual interaction.
         System.out.println("System started. Interact via Command Center or Passenger GUI to drive elevators.");
         Thread.sleep(1000);
 

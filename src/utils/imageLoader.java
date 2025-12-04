@@ -1,11 +1,11 @@
 package utils;
-import javafx.scene.image.Image;
-import java.util.ArrayList;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.stream.Stream;
+import javafx.scene.image.Image;
 
 /**
  * Utility class to load in the PFD images for the GUI.

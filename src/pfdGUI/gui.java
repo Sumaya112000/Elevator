@@ -83,7 +83,7 @@ public class gui extends Application {
         }
         public boolean getIsCabinOverloaded(int ID) {
             int panelIndex = ID - 1;
-            return (panelIndex >= 0 && panelIndex < numElevators) ? cabinOverloads[panelIndex] : false;
+            return (panelIndex >= 0 && panelIndex < numElevators) ? internalState.cabinOverloads[panelIndex] : false;
         }
         public boolean getFireAlarm() { return fireAlarmActive; }
 

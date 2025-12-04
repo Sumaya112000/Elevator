@@ -63,9 +63,10 @@ public class DoorAssembly implements Runnable {
                 else if (m.getBody() == CLOSE) { /* Command received */ }
                 else if (m.getBody() == OPEN) { /* Command received */ }
 
-                // Simplified reset logic for sensors
+                // Simplified reset logic for sensors (do NOT reset overCapacity on other messages)
                 if (m.getBody() != OBSTRUCTED) obstructed = false;
-                if (m.getBody() != OVERCAPACITY) overCapacity = false;
+                // overCapacity should only be set/cleared by explicit OVERCAPACITY messages
+                // Do NOT auto-reset it on other messages
             }
 
             try {

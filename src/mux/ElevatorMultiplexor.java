@@ -237,6 +237,7 @@ public class ElevatorMultiplexor {
     // Poll and publish cabin overload state changes
     private void pollCabinOverload() {
         boolean isOverloaded = elev.display.isOverloaded();
+        System.out.println("ElevatorMUX " + ID + " pollCabinOverload: isOverloaded=" + isOverloaded + " lastState=" + lastOverloadState);
         if (isOverloaded != lastOverloadState) {
             // Emit CABIN_LOAD message (Topic 205) only on state change
             int v;
@@ -244,6 +245,20 @@ public class ElevatorMultiplexor {
             else v = 0;
             Message loadMsg = new Message(SoftwareBusCodes.cabinLoad, ID, v);
             bus.publish(loadMsg);
+            System.out.println("ElevatorMUX " + ID + " - Published cabinLoad message: overload=" + isOverloaded);
+            
+            // Also publish to DoorAssembly so it updates its overCapacity flag
+            // This prevents elevator movement when overload button is pressed
+            int doorMsg;
+            if (isOverloaded) {
+                doorMsg = elevatorController.Util.ConstantsElevatorControl.OVERCAPACITY;
+            } else {
+                doorMsg = elevatorController.Util.ConstantsElevatorControl.FULLYOPEN; // Reset with a different message
+            }
+            Message overloadMsg = new Message(elevatorController.Util.ConstantsElevatorControl.DOORASSEMBLY, ID, doorMsg);
+            bus.publish(overloadMsg);
+            System.out.println("ElevatorMUX " + ID + " - Published DoorAssembly overload message: doorMsg=" + doorMsg);
+            
             lastOverloadState = isOverloaded;
         }
     }
@@ -399,7 +414,8 @@ public class ElevatorMultiplexor {
     // Handle car dispatch messages
     private void handleCarDispatch(Message msg) {
         int dir = msg.getBody();
-        System.out.println("ElevatorMUX " + ID + " handleCarDispatch: dir=" + dir + " doorClosed=" + elev.door.isFullyClosed() + " enabled=" + enabled);
+        boolean overloaded = elev.display.isOverloaded();
+        System.out.println("ElevatorMUX " + ID + " handleCarDispatch: dir=" + dir + " doorClosed=" + elev.door.isFullyClosed() + " enabled=" + enabled + " overloaded=" + overloaded);
 
         // If elevator is stopped (disabled), do not dispatch
         if (!enabled) {
@@ -409,6 +425,11 @@ public class ElevatorMultiplexor {
         // If fire recall is active, prevent normal dispatches
         if (inFireMode) {
             System.out.println("ElevatorMUX " + ID + " - carDispatch ignored: in FIRE recall");
+            return;
+        }
+        // If overload is active, do not dispatch
+        if (elev.display.isOverloaded()) {
+            System.out.println("ElevatorMUX " + ID + " *** DISPATCH BLOCKED: cabin overload is ACTIVE ***");
             return;
         }
 
@@ -457,6 +478,11 @@ public class ElevatorMultiplexor {
             System.out.println("ElevatorMUX " + ID + " - cabinSelect ignored: in FIRE recall");
             return;
         }
+        // Ignore cabin selections during overload
+        if (elev.display.isOverloaded()) {
+            System.out.println("ElevatorMUX " + ID + " - cabinSelect ignored: cabin overload detected");
+            return;
+        }
         if (floor == currentFloor) {
             System.out.println("ElevatorMUX " + ID + " cabinSelect equals currentFloor - opening doors");
             elev.door.open();
@@ -480,7 +506,8 @@ public class ElevatorMultiplexor {
     // Handle a hall call targeted at this car (demo fallback when no scheduler exists)
     private void handleHallCall(Message msg) {
         int floor = msg.getBody();
-        System.out.println("ElevatorMUX " + ID + " *** HANDLING HALL CALL: floor=" + floor + " currentFloor=" + currentFloor + " targetFloor=" + targetFloor + " enabled=" + enabled + " inFireMode=" + inFireMode);
+        boolean overloaded = elev.display.isOverloaded();
+        System.out.println("ElevatorMUX " + ID + " *** HANDLING HALL CALL: floor=" + floor + " currentFloor=" + currentFloor + " overloaded=" + overloaded + " inFireMode=" + inFireMode);
         // Ignore normal requests while in fire recall
         if (inFireMode) {
             System.out.println("ElevatorMUX " + ID + " - hallCall ignored: in FIRE recall");
@@ -488,6 +515,11 @@ public class ElevatorMultiplexor {
         }
         if (!enabled) {
             System.out.println("ElevatorMUX " + ID + " - hallCall ignored: elevator is stopped/disabled");
+            return;
+        }
+        // Ignore hall calls during overload
+        if (elev.display.isOverloaded()) {
+            System.out.println("ElevatorMUX " + ID + " *** HALLCALL REJECTED: cabin overload is ACTIVE ***");
             return;
         }
         if (floor == currentFloor) {

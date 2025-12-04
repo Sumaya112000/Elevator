@@ -3,7 +3,6 @@ package elevatorController.HigherLevel;
 import elevatorController.LowerLevel.*;
 import elevatorController.Util.FloorNDirection;
 import elevatorController.Util.State;
-import static elevatorController.Util.ConstantsElevatorControl.*;
 
 public class Normal {
     private Mode mode;
@@ -64,7 +63,8 @@ public class Normal {
         }
 
         // Movement Logic (only if doors are fully closed or in motion)
-        if (doorAssembly.fullyClosed()) {
+        // Do NOT move if overload button is pressed
+        if (doorAssembly.fullyClosed() && !doorAssembly.overCapacity()) {
             FloorNDirection nextDest = buttons.nextService(cabin.currentStatus());
 
             if (nextDest != null) {
