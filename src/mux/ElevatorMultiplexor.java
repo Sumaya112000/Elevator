@@ -2,9 +2,14 @@ package mux;
 
 import Bus.*;
 import Message.*;
+import javafx.application.Platform;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 import motion.MotionAPI;
 import motion.Util.Direction;
 import pfdAPI.*;
+
+import java.net.URL;
 
 /**
  * Class that defines the ElevatorMultiplexor, which coordinates communication from the Elevator
@@ -15,7 +20,6 @@ import pfdAPI.*;
  */
 public class ElevatorMultiplexor {
 
-    // Constructor
     public ElevatorMultiplexor(int ID){
         this.ID = ID;
         this.elev = new Elevator(ID, 10);
@@ -40,13 +44,16 @@ public class ElevatorMultiplexor {
     private boolean enabled = true;
     // Fire recall state: when true, elevator should recall to floor 1 and hold doors open
     private boolean inFireMode = false;
+    // True if doors are being held open due to fire recall at floor 1
     private boolean doorsHeldForFire = false;
     // Debounce pending floor detection to avoid oscillation between adjacent floors
     private int pendingDetectedFloor = -1;
     private int pendingDetectCount = 0;
     private final int FLOOR_CONFIRM_THRESHOLD = 2;
 
-    // Initialize the MUX
+    // Persistent MediaPlayer for the looping overload warning
+    private MediaPlayer overloadPlayer = null;
+
     public void initialize() {
         bus.subscribe(SoftwareBusCodes.doorControl, ID);
         bus.subscribe(SoftwareBusCodes.displayFloor, ID);
@@ -73,10 +80,6 @@ public class ElevatorMultiplexor {
         startStatePoller();
     }
 
-
-    /**
-     * Incoming Message Polling
-     */
 
     // Polls the software bus for messages and handles them accordingly
     public void startBusPoller() {
@@ -168,10 +171,6 @@ public class ElevatorMultiplexor {
         t.start();
     }
 
-    /**
-     * Internal State Polling Functions
-     */
-
     // Polls the elevator state periodically and publishes updates to the bus
     private void startStatePoller() {
         Thread statePoller = new Thread(() -> {
@@ -237,7 +236,6 @@ public class ElevatorMultiplexor {
     // Poll and publish cabin overload state changes
     private void pollCabinOverload() {
         boolean isOverloaded = elev.display.isOverloaded();
-        System.out.println("ElevatorMUX " + ID + " pollCabinOverload: isOverloaded=" + isOverloaded + " lastState=" + lastOverloadState);
         if (isOverloaded != lastOverloadState) {
             // Emit CABIN_LOAD message (Topic 205) only on state change
             int v;
@@ -245,20 +243,17 @@ public class ElevatorMultiplexor {
             else v = 0;
             Message loadMsg = new Message(SoftwareBusCodes.cabinLoad, ID, v);
             bus.publish(loadMsg);
-            System.out.println("ElevatorMUX " + ID + " - Published cabinLoad message: overload=" + isOverloaded);
-            
-            // Also publish to DoorAssembly so it updates its overCapacity flag
-            // This prevents elevator movement when overload button is pressed
-            int doorMsg;
+
+            // --- Overload Sound Logic ---
             if (isOverloaded) {
-                doorMsg = elevatorController.Util.ConstantsElevatorControl.OVERCAPACITY;
+                // Start looping warning
+                playOverloadWarning();
             } else {
-                doorMsg = elevatorController.Util.ConstantsElevatorControl.FULLYOPEN; // Reset with a different message
+                // Stop looping warning
+                stopOverloadWarning();
             }
-            Message overloadMsg = new Message(elevatorController.Util.ConstantsElevatorControl.DOORASSEMBLY, ID, doorMsg);
-            bus.publish(overloadMsg);
-            System.out.println("ElevatorMUX " + ID + " - Published DoorAssembly overload message: doorMsg=" + doorMsg);
-            
+            // --- End Overload Sound Logic ---
+
             lastOverloadState = isOverloaded;
         }
     }
@@ -280,9 +275,9 @@ public class ElevatorMultiplexor {
         if (topChanged) bus.publish(new Message(SoftwareBusCodes.topSensor, ID, topSensor));
         if (botChanged) bus.publish(new Message(SoftwareBusCodes.bottomSensor, ID, bottomSensor));
 
-        // Calculate new floor
-        int newFloor = (bottomSensor / 2) + 1; // +1 for indexing
-        if (newFloor < 1 || newFloor > elev.totalFloors) { // Invalid floor
+        // Calculate new floor (bottom sensor / 2) + 1 for 1-based indexing
+        int newFloor = (bottomSensor / 2) + 1;
+        if (newFloor < 1 || newFloor > elev.totalFloors) { // Check for invalid floor
             lastTopSensorRead = topSensor;
             lastBottomSensorRead = bottomSensor;
             System.out.println("ElevatorMUX " + ID + ": Invalid floor detected: " + newFloor);
@@ -309,21 +304,25 @@ public class ElevatorMultiplexor {
                 bus.publish(new Message(SoftwareBusCodes.currMovement, ID, 0));
                 bus.publish(new Message(SoftwareBusCodes.currDirection, ID, 2));
                 elev.door.open();
-                    // publish door status
-                    bus.publish(new Message(SoftwareBusCodes.doorStatus, ID, SoftwareBusCodes.doorOpen));
-                    // If not in fire-hold, schedule an automatic close after a short dwell time
-                    if (!inFireMode) {
-                        new Thread(() -> {
-                            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
-                            // Close doors and publish status (only if not obstructed)
-                            elev.door.close();
-                            if (elev.door.isFullyClosed()) {
-                                bus.publish(new Message(SoftwareBusCodes.doorStatus, ID, SoftwareBusCodes.doorClose));
-                            } else {
-                                bus.publish(new Message(SoftwareBusCodes.doorStatus, ID, SoftwareBusCodes.doorOpen));
-                            }
-                        }).start();
-                    }
+                // publish door status
+                bus.publish(new Message(SoftwareBusCodes.doorStatus, ID, SoftwareBusCodes.doorOpen));
+
+                // Trigger arrival chime
+                playArrivalChime();
+
+                // If not in fire-hold, schedule an automatic close after a short dwell time
+                if (!inFireMode) {
+                    new Thread(() -> {
+                        try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                        // Close doors and publish status (only if not obstructed)
+                        elev.door.close();
+                        if (elev.door.isFullyClosed()) {
+                            bus.publish(new Message(SoftwareBusCodes.doorStatus, ID, SoftwareBusCodes.doorClose));
+                        } else {
+                            bus.publish(new Message(SoftwareBusCodes.doorStatus, ID, SoftwareBusCodes.doorOpen));
+                        }
+                    }).start();
+                }
                 // Reset the cabin button in the UI (clear the floor selection)
                 bus.publish(new Message(SoftwareBusCodes.resetFloorSelection, ID, targetFloor));
                 System.out.println("ElevatorMUX " + ID + " published resetFloorSelection for floor " + targetFloor);
@@ -358,14 +357,9 @@ public class ElevatorMultiplexor {
     }
 
 
-    // Getter for Elevator
     public Elevator getElevator() {
         return elev;
     }
-
-    /**
-     * Incoming Message Handlers
-     */
 
     // Handle door control messages
     private void handleDoorControl(Message msg) {
@@ -414,8 +408,7 @@ public class ElevatorMultiplexor {
     // Handle car dispatch messages
     private void handleCarDispatch(Message msg) {
         int dir = msg.getBody();
-        boolean overloaded = elev.display.isOverloaded();
-        System.out.println("ElevatorMUX " + ID + " handleCarDispatch: dir=" + dir + " doorClosed=" + elev.door.isFullyClosed() + " enabled=" + enabled + " overloaded=" + overloaded);
+        System.out.println("ElevatorMUX " + ID + " handleCarDispatch: dir=" + dir + " doorClosed=" + elev.door.isFullyClosed() + " enabled=" + enabled);
 
         // If elevator is stopped (disabled), do not dispatch
         if (!enabled) {
@@ -427,9 +420,9 @@ public class ElevatorMultiplexor {
             System.out.println("ElevatorMUX " + ID + " - carDispatch ignored: in FIRE recall");
             return;
         }
-        // If overload is active, do not dispatch
+        // Block dispatch if cabin is overloaded
         if (elev.display.isOverloaded()) {
-            System.out.println("ElevatorMUX " + ID + " *** DISPATCH BLOCKED: cabin overload is ACTIVE ***");
+            System.out.println("ElevatorMUX " + ID + " - carDispatch blocked: cabin overload is active");
             return;
         }
 
@@ -506,8 +499,7 @@ public class ElevatorMultiplexor {
     // Handle a hall call targeted at this car (demo fallback when no scheduler exists)
     private void handleHallCall(Message msg) {
         int floor = msg.getBody();
-        boolean overloaded = elev.display.isOverloaded();
-        System.out.println("ElevatorMUX " + ID + " *** HANDLING HALL CALL: floor=" + floor + " currentFloor=" + currentFloor + " overloaded=" + overloaded + " inFireMode=" + inFireMode);
+        System.out.println("ElevatorMUX " + ID + " *** HANDLING HALL CALL: floor=" + floor + " currentFloor=" + currentFloor + " targetFloor=" + targetFloor + " enabled=" + enabled + " inFireMode=" + inFireMode);
         // Ignore normal requests while in fire recall
         if (inFireMode) {
             System.out.println("ElevatorMUX " + ID + " - hallCall ignored: in FIRE recall");
@@ -517,9 +509,9 @@ public class ElevatorMultiplexor {
             System.out.println("ElevatorMUX " + ID + " - hallCall ignored: elevator is stopped/disabled");
             return;
         }
-        // Ignore hall calls during overload
+        // Block hall calls if cabin is overloaded
         if (elev.display.isOverloaded()) {
-            System.out.println("ElevatorMUX " + ID + " *** HALLCALL REJECTED: cabin overload is ACTIVE ***");
+            System.out.println("ElevatorMUX " + ID + " - hallCall blocked: cabin overload is active");
             return;
         }
         if (floor == currentFloor) {
@@ -619,13 +611,15 @@ public class ElevatorMultiplexor {
         elev.panel.setButtonsSingle(body);
     }
 
-    // Handle play arrival/overload Message
+    // Handle play arrival/overload Message received from bus
     public void handlePlaySound(Message msg){
         int type = msg.getBody();
         if (type == 0) {
-            elev.display.playArrivalChime();
+            playArrivalChime();
         } else {
-            elev.display.playOverLoadWarning();
+            // Note: This function assumes the overload sound is already managed by pollCabinOverload for looping.
+            // This is primarily for external commands that want a one-off play (which we ignore for overload looping safety).
+            playOverloadWarning();
         }
     }
 
@@ -704,5 +698,76 @@ public class ElevatorMultiplexor {
         bus.publish(new Message(SoftwareBusCodes.currMovement, ID, 0));
         bus.publish(new Message(SoftwareBusCodes.currDirection, ID, 2));
         System.out.println("ElevatorMUX " + ID + " - FIRE CLEARED: Elevator stopped, normal requests accepted");
+    }
+
+    /**
+     * Play arrival chime sound. Must be run on the Platform thread.
+     */
+    private void playArrivalChime() {
+        System.out.println("*Ding! Elevator " + ID + " has arrived.");
+        Platform.runLater(() -> {
+            try {
+                // Sound file path in resources folder: /sounds/ding.mp3
+                URL sound = getClass().getResource("/sounds/ding.mp3");
+                if (sound == null) {
+                    System.err.println("Ding sound file not found at /sounds/ding.mp3");
+                    return;
+                }
+                Media media = new Media(sound.toExternalForm());
+                MediaPlayer player = new MediaPlayer(media);
+                player.play();
+            } catch (Exception e) {
+                System.err.println("Error playing arrival chime: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Play overload warning sound in a loop. Must be run on the Platform thread.
+     */
+    private void playOverloadWarning() {
+        if (overloadPlayer != null) {
+            // If already playing, do nothing
+            if (overloadPlayer.getStatus() == MediaPlayer.Status.PLAYING) return;
+            // Stop and dispose if in an unexpected state before re-creating
+            overloadPlayer.stop();
+            overloadPlayer.dispose();
+        }
+
+        System.out.println("*Buzz! Warning: Overload detected on Elevator " + ID);
+        Platform.runLater(() -> {
+            try {
+                // Sound file path in resources folder: /sounds/buzz.mp3
+                URL sound = getClass().getResource("/sounds/buzz.mp3");
+                if (sound == null) {
+                    System.err.println("Buzz sound file not found at /sounds/buzz.mp3");
+                    return;
+                }
+                Media media = new Media(sound.toExternalForm());
+                overloadPlayer = new MediaPlayer(media);
+
+                // Set to loop indefinitely
+                overloadPlayer.setCycleCount(MediaPlayer.INDEFINITE);
+                overloadPlayer.play();
+            } catch (Exception e) {
+                System.err.println("Error playing overload warning: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Stop the currently looping overload warning sound.
+     */
+    private void stopOverloadWarning() {
+        Platform.runLater(() -> {
+            if (overloadPlayer != null) {
+                if (overloadPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
+                    System.out.println("Overload cleared, stopping buzz.");
+                    overloadPlayer.stop();
+                    overloadPlayer.dispose(); // Release resources
+                }
+                overloadPlayer = null;
+            }
+        });
     }
 }
